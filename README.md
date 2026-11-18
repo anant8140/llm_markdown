@@ -2,7 +2,7 @@
 
 Markdown widget for chat apps that stream replies from an LLM.
 
-<img src="https://raw.githubusercontent.com/anant8140/llm_markdown/main/doc/demo.gif" width="320" alt="A reply streaming in: headings, a list, a code block, a table and a checklist">
+<img src="https://raw.githubusercontent.com/anant8140/llm_markdown/main/doc/demo.gif" width="320" alt="A reply streaming in: a thinking section, math, a code block and a checklist">
 
 If you render a streaming reply with a regular Markdown widget, the whole
 text is parsed again on every chunk. That gets slow on long answers, you see
@@ -19,6 +19,11 @@ This package fixes that:
 - Text is revealed at a steady speed instead of in bursts, and it speeds up
   if it falls behind.
 - Code blocks have a copy button and get syntax highlighting once closed.
+- LaTeX math: `$...$`, `\(...\)`, `$$...$$` and `\[...\]`. Prices like
+  "$5 and $10" are left alone.
+- Reasoning from `<think>...</think>` (DeepSeek, Qwen, ...) or from a separate
+  reasoning stream goes into a collapsible "Thought for 12s" section.
+- The newest characters fade in as they appear.
 - Optional auto-scroll that stops when the user scrolls up to read.
 - Depends only on `flutter/widgets.dart`, so it works with `material_ui`, the
   old `flutter/material.dart`, Cupertino or no design library at all.
@@ -68,6 +73,39 @@ StreamingMarkdown.text(message.text, isComplete: message.done)
 
 If the new text starts with the old one, only the added part is processed.
 
+### Math
+
+Formulas are found and kept intact while they stream; drawing them is up to
+you, so you can pick the math package. With
+[`flutter_math_fork`](https://pub.dev/packages/flutter_math_fork):
+
+```dart
+StreamingMarkdown(
+  controller: controller,
+  mathBuilder: (context, tex, display) => Math.tex(
+    tex,
+    mathStyle: display ? MathStyle.display : MathStyle.text,
+  ),
+)
+```
+
+A formula that is still arriving shows its source until it's closed. Without
+a `mathBuilder` the source is shown.
+
+### Thinking
+
+If the reply starts with `<think>...</think>`, that part goes into a section
+above the answer. It shows "Thinking..." while it streams and "Thought for
+Ns" after. For APIs that send reasoning separately:
+
+```dart
+controller.appendThinking(reasoningChunk);
+controller.append(answerChunk);
+```
+
+`showThinking: false` drops it, `thinkingInitiallyExpanded: true` opens it,
+and `thinkingLabel` changes the title (e.g. to translate it).
+
 ### Chat list
 
 ```dart
@@ -93,7 +131,11 @@ selectable. With `ListView(reverse: true)` you don't need
 
 | Option | Default | |
 | --- | --- | --- |
-| `smoothing` | `Smoothing.adaptive()` | `Smoothing.none()` shows text right away |
+| `smoothing` | `Smoothing.adaptive()` | `Smoothing.none()` shows text right away; `fadeLength: 0` turns the fade off |
+| `mathBuilder` | – | draws LaTeX, see above |
+| `showThinking` | `true` | |
+| `thinkingInitiallyExpanded` | `false` | |
+| `thinkingLabel` | English | title of the thinking section |
 | `style` | from context | see below |
 | `onLinkTap` | – | called with the link URL |
 | `imageBuilder` | `Image.network` | |
@@ -139,7 +181,7 @@ finished block matches a normal parse of the full text.
 - Once a footnote definition appears, the reply is parsed as a whole again
   (correct, just not incremental).
 - Raw HTML is shown as text.
-- No LaTeX yet.
+- Inline math has to fit on one line.
 
 Tested on Flutter 3.35 and 3.50.
 

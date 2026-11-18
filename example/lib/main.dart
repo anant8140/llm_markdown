@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:llm_markdown/llm_markdown.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -141,6 +142,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   ? const Smoothing.adaptive()
                   : const Smoothing.none(),
               autoScrollController: _scroll,
+              mathBuilder: (context, tex, display) => Math.tex(
+                tex,
+                mathStyle: display ? MathStyle.display : MathStyle.text,
+                onErrorFallback: (error) => Text(tex),
+              ),
               onLinkTap: (url) =>
                   ScaffoldMessenger.of(context)
                       .showSnackBar(SnackBar(content: Text('Open $url'))),
@@ -158,7 +164,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-const String _answer = '''
+const String _answer = r'''
+<think>
+They want to show streaming replies. The main problems are re-parsing the
+whole text on every chunk and half-typed syntax. I'll show the package and
+a short example.
+</think>
+
 ## Streaming Markdown in Flutter
 
 Use **llm_markdown**. It parses only the *new* text, so long replies stay
@@ -178,6 +190,14 @@ await for (final chunk in model.generate(prompt)) {
 }
 controller.complete();
 ```
+
+### A bit of math
+
+Reveal speed grows with the backlog: $v = \max(v_0, \frac{n}{t})$.
+
+$$
+\int_0^1 x^2 \, dx = \frac{1}{3}
+$$
 
 ### Why it feels fast
 
