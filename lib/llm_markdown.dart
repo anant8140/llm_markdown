@@ -21,4 +21,5 @@ export 'src/renderer.dart'
 export 'src/smoothing.dart' show RevealUnit, Smoothing;
 export 'src/streaming_markdown.dart' show StreamingMarkdown;
 export 'src/style.dart' show StreamingMarkdownStyle;
+export 'src/syntaxes.dart' show MarkdownSyntax;
 export 'src/thinking.dart' show ThinkingLabelBuilder;

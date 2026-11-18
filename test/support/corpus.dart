@@ -162,6 +162,29 @@ E = mc^2
 - a list with $a_1$
 - and $$b$$ inline display
 ''',
+  'html comment followed by html lines': '''
+<!-- a note -->
+<details>
+<summary>Steps</summary>
+
+body text
+</details>
+
+After the html.
+''',
+  'details with blank lines inside': '''
+Intro.
+<details>
+<summary>More</summary>
+
+First **part**.
+
+- one
+- two
+</details>
+
+Outro.
+''',
   'list ends with unindented text after blank line': '''
 - one
 - two

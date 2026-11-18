@@ -13,6 +13,7 @@ import 'renderer.dart';
 import 'safety.dart';
 import 'smoothing.dart';
 import 'style.dart';
+import 'syntaxes.dart';
 import 'thinking.dart';
 
 /// Shows Markdown that arrives in pieces, such as an AI chat reply, without
@@ -66,6 +67,8 @@ class StreamingMarkdown extends StatefulWidget {
     this.cursorStyle = StreamingCursorStyle.block,
     this.fadeBottomEdge = false,
     this.updateInterval = Duration.zero,
+    this.syntax = const MarkdownSyntax(),
+    this.onCitationTap,
     this.autoScrollController,
   }) : stream = null,
        text = null,
@@ -104,6 +107,8 @@ class StreamingMarkdown extends StatefulWidget {
     this.cursorStyle = StreamingCursorStyle.block,
     this.fadeBottomEdge = false,
     this.updateInterval = Duration.zero,
+    this.syntax = const MarkdownSyntax(),
+    this.onCitationTap,
     this.autoScrollController,
   }) : controller = null,
        text = null,
@@ -142,6 +147,8 @@ class StreamingMarkdown extends StatefulWidget {
     this.cursorStyle = StreamingCursorStyle.block,
     this.fadeBottomEdge = false,
     this.updateInterval = Duration.zero,
+    this.syntax = const MarkdownSyntax(),
+    this.onCitationTap,
     this.autoScrollController,
   }) : controller = null,
        stream = null;
@@ -266,6 +273,14 @@ class StreamingMarkdown extends StatefulWidget {
   /// save work when a model sends many tiny chunks.
   final Duration updateInterval;
 
+  /// Which Markdown extensions are recognized: math with `$`, alerts,
+  /// citations, emoji, highlight and spoilers, a little HTML, `<details>`
+  /// and autolinks. All are on by default.
+  final MarkdownSyntax syntax;
+
+  /// Called with the number of a tapped citation chip, e.g. 1 for `[1]`.
+  final ValueChanged<int>? onCitationTap;
+
   /// The scroll controller of the list that holds this widget.
   ///
   /// When given, the list keeps following the end of the text as it grows,
@@ -280,10 +295,14 @@ class StreamingMarkdown extends StatefulWidget {
 
 class _StreamingMarkdownState extends State<StreamingMarkdown>
     with SingleTickerProviderStateMixin {
-  final IncrementalMarkdownParser _parser = IncrementalMarkdownParser();
+  late IncrementalMarkdownParser _parser = IncrementalMarkdownParser(
+    syntax: widget.syntax,
+  );
   final RenderSettings _settings = RenderSettings();
   final Map<int, Widget> _blockWidgets = {};
-  final IncrementalMarkdownParser _thinkingParser = IncrementalMarkdownParser();
+  late IncrementalMarkdownParser _thinkingParser = IncrementalMarkdownParser(
+    syntax: widget.syntax,
+  );
   final Map<int, Widget> _thinkingWidgets = {};
   DateTime? _thinkingStarted;
   Duration? _thinkingTook;
@@ -433,6 +452,12 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
   @override
   void didUpdateWidget(StreamingMarkdown oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.syntax != oldWidget.syntax) {
+      _parser = IncrementalMarkdownParser(syntax: widget.syntax);
+      _thinkingParser = IncrementalMarkdownParser(syntax: widget.syntax);
+      _blockWidgets.clear();
+      _thinkingWidgets.clear();
+    }
     final sourceChanged =
         widget.controller != oldWidget.controller ||
         widget.stream != oldWidget.stream ||
@@ -578,6 +603,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       ..showCursor = widget.showCursor
       ..fadeLength = _smoothing.fadeLength
       ..cursorStyle = widget.cursorStyle
+      ..onCitationTap = widget.onCitationTap
       ..linkSchemes = widget.allowedLinkSchemes
       ..imageSchemes = widget.allowedImageSchemes
       ..detectTextDirection = widget.detectTextDirection;

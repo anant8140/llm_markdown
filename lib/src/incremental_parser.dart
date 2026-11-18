@@ -5,6 +5,7 @@ import 'package:markdown/markdown.dart' as md;
 import 'block_splitter.dart';
 import 'healer.dart';
 import 'math.dart';
+import 'syntaxes.dart';
 
 // Footnotes need the whole document (numbering, the list at the end), so
 // once a definition shows up we stop splitting. Rare in practice.
@@ -24,9 +25,11 @@ class FrozenBlock {
 }
 
 class IncrementalMarkdownParser {
-  IncrementalMarkdownParser() {
+  IncrementalMarkdownParser({this.syntax = const MarkdownSyntax()}) {
     _document = _newDocument();
   }
+
+  final MarkdownSyntax syntax;
 
   late md.Document _document;
   final List<FrozenBlock> _frozen = [];
@@ -48,7 +51,7 @@ class IncrementalMarkdownParser {
 
   bool get isComplete => _complete;
 
-  static md.Document _newDocument() => newMarkdownDocument();
+  md.Document _newDocument() => newMarkdownDocument(syntax);
 
   void reset() {
     _document = _newDocument();
@@ -79,6 +82,7 @@ class IncrementalMarkdownParser {
       text,
       start,
       complete: complete,
+      dollarMath: syntax.dollarMath,
     )) {
       newReferences |= _freeze(text.substring(start, boundary));
       start = boundary;
@@ -96,7 +100,9 @@ class IncrementalMarkdownParser {
     } else {
       final document = _newDocument()
         ..linkReferences.addAll(_document.linkReferences);
-      _openNodes = document.parse(healIncompleteMarkdown(open));
+      _openNodes = document.parse(
+        healIncompleteMarkdown(open, dollarMath: syntax.dollarMath),
+      );
     }
     return true;
   }
@@ -111,7 +117,9 @@ class IncrementalMarkdownParser {
       _openNodes = const [];
     } else {
       _openStart = 0;
-      _openNodes = _document.parse(healIncompleteMarkdown(text));
+      _openNodes = _document.parse(
+        healIncompleteMarkdown(text, dollarMath: syntax.dollarMath),
+      );
     }
   }
 

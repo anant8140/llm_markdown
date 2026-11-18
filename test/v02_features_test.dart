@@ -92,11 +92,14 @@ void main() {
       expect(built, contains((r'\frac{1}{2}', true)));
     });
 
-    testWidgets('without a builder the source is shown', (tester) async {
+    testWidgets('without a builder a readable version is shown', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _host(const StreamingMarkdown.text('Area \$\\pi r^2\$.')),
       );
-      expect(_shown(tester), contains(r'$\pi r^2$'));
+      expect(_shown(tester), contains('Area π r²'));
+      expect(_shown(tester), isNot(contains(r'\pi')));
     });
   });
 

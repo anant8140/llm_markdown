@@ -3,6 +3,7 @@
 // the wrong output.
 
 import 'math.dart';
+import 'syntaxes.dart';
 
 final RegExp _listMarker = RegExp(r'^ {0,3}(?:[-+*]|\d{1,9}[.)])(?:[ \t]|$)');
 final RegExp _partialListMarker = RegExp(r'^ {0,3}(?:[-+*]|\d{1,9}[.)]?)$');
@@ -82,7 +83,9 @@ List<int> findBlockBoundaries(
   String text,
   int start, {
   required bool complete,
+  bool dollarMath = true,
 }) {
+  final mathOpener = mathOpenerFor(dollar: dollarMath);
   final boundaries = <int>[];
   var pos = start;
   var hasContent = false;
@@ -94,6 +97,10 @@ List<int> findBlockBoundaries(
   OpenFence? fence;
   RegExp? mathEnd;
   RegExp? htmlEnd;
+  var details = 0;
+  // set after <!-- ... --> and friends end: a directly following HTML line
+  // joins the same block in the markdown package
+  var htmlChain = false;
 
   void startBlockAt(int offset) {
     if (offset > start && (boundaries.isEmpty || offset > boundaries.last)) {
@@ -132,8 +139,49 @@ List<int> findBlockBoundaries(
       continue;
     }
 
+    // <details> can hold blank lines; it ends at its closing tag
+    if (htmlChain) {
+      htmlChain = false;
+      final raw = _htmlRawBlock.firstMatch(line);
+      if (raw != null) {
+        final end = _htmlEndFor(raw);
+        if (end.hasMatch(line.substring(raw.end))) {
+          htmlChain = true;
+        } else {
+          htmlEnd = end;
+        }
+        pos = next;
+        continue;
+      }
+      if (_htmlBlock.hasMatch(line)) {
+        inHtmlBlock = true;
+        pos = next;
+        continue;
+      }
+    }
+
+    final startsDetails =
+        !inHtmlBlock &&
+        !(continuable && _indentWidth(line) > 0) &&
+        _shallow(line) &&
+        detailsOpener.hasMatch(line);
+    if (details > 0 || startsDetails) {
+      if (detailsOpener.hasMatch(line)) {
+        if (details == 0 && hasContent) startBlockAt(pos);
+        details++;
+      }
+      if (detailsCloser.hasMatch(line)) details--;
+      hasContent = true;
+      if (details == 0 && lineComplete && hasNewline) startBlockAt(next);
+      pos = next;
+      continue;
+    }
+
     if (htmlEnd != null) {
-      if (htmlEnd.hasMatch(line)) htmlEnd = null;
+      if (htmlEnd.hasMatch(line)) {
+        htmlEnd = null;
+        htmlChain = true;
+      }
       pos = next;
       continue;
     }
@@ -165,7 +213,7 @@ List<int> findBlockBoundaries(
     final nested = continuable && indent > 0;
 
     if (indent <= 3 && !nested && !inHtmlBlock) {
-      final math = mathBlockOpener.firstMatch(line);
+      final math = mathOpener.firstMatch(line);
       if (math != null) {
         // "$$" could still become "$$x$$" on one line
         if (!lineComplete) break;
@@ -206,7 +254,11 @@ List<int> findBlockBoundaries(
       final html = _htmlRawBlock.firstMatch(line);
       if (html != null) {
         final end = _htmlEndFor(html);
-        if (!end.hasMatch(line.substring(html.end))) htmlEnd = end;
+        if (end.hasMatch(line.substring(html.end))) {
+          htmlChain = true;
+        } else {
+          htmlEnd = end;
+        }
         hasContent = true;
         pos = next;
         continue;
@@ -226,3 +278,5 @@ List<int> findBlockBoundaries(
 
   return boundaries;
 }
+
+bool _shallow(String line) => _indentWidth(line) <= 3;

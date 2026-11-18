@@ -55,11 +55,23 @@ const _pieces = [
   'Display \$\$\\sum_i i\$\$ inline.\n',
   '\$\$\n',
   'emoji 🚀 and ગુજરાતી\n',
+  '> [!NOTE]\n> An alert.\n',
+  '> [!WARNING]\n> Careful.\n\n> plain quote\n',
+  '<details>\n<summary>More</summary>\n\nHidden **text**.\n\n- item\n</details>\n',
+  '<details>\n',
+  'Cited fact [1] and another [2], but a[1] is code.\n',
+  'Some ==highlighted== and ||spoiler|| text.\n',
+  'H<sub>2</sub>O and x<sup>2</sup>, <kbd>Ctrl</kbd>+<kbd>C</kbd><br>next\n',
+  'Ship it :rocket: :tada:\n',
+  'See the source [1].\n\n[1]: https://example.com\n',
+  '> [!TIP]\n> First line.\n> Second line.\n',
   '[link](https://dart.dev) and https://flutter.dev\n',
   '![img](https://example.com/a.png)\n',
 ];
 
 md.Document _document() => newMarkdownDocument();
+
+final RegExp _definition = RegExp(r'^ {0,3}\[[^\]]+\]:', multiLine: true);
 
 String _html(md.Node node) =>
     node is md.Text ? node.text.trim() : md.renderToHtml([node]);
@@ -74,6 +86,10 @@ void main() {
           _pieces[random.nextInt(_pieces.length)],
       ].join();
       final expected = _document().parse(text).map(_html).toList();
+      // A link reference defined further down changes earlier blocks once
+      // it arrives (they are parsed again), so only the end result is
+      // compared for those.
+      final strict = !_definition.hasMatch(text);
 
       final parser = IncrementalMarkdownParser();
       var position = 0;
@@ -85,7 +101,7 @@ void main() {
           for (final block in parser.frozenBlocks)
             for (final node in block.nodes) _html(node),
         ];
-        for (var i = 0; i < frozen.length; i++) {
+        for (var i = 0; strict && i < frozen.length; i++) {
           if (i >= expected.length || frozen[i] != expected[i]) {
             failures.add(
               'seed $seed, ${text.substring(0, position).length} chars:\n'

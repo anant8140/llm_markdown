@@ -28,7 +28,8 @@ final RegExp _wordCharacter = RegExp(r'[\p{L}\p{N}]', unicode: true);
 ///
 /// Complete Markdown is returned unchanged. Call this only while the text is
 /// still arriving: once it is complete, parse it as it is.
-String healIncompleteMarkdown(String source) {
+String healIncompleteMarkdown(String source, {bool dollarMath = true}) {
+  final mathOpener = mathOpenerFor(dollar: dollarMath);
   if (source.contains('\r')) {
     // a chunk can end between \r and \n
     source = source.replaceAll('\r\n', '\n');
@@ -48,7 +49,7 @@ String healIncompleteMarkdown(String source) {
       continue;
     }
     if (fence == null) {
-      final math = mathBlockOpener.firstMatch(line);
+      final math = mathOpener.firstMatch(line);
       if (math != null) {
         mathEnd = mathBlockCloserFor(math[1]!);
         continue;
@@ -80,7 +81,7 @@ String healIncompleteMarkdown(String source) {
     return _joinFirst(lines, last);
   }
 
-  final healed = healIncompleteInline(lines[last]);
+  final healed = _healHtml(healIncompleteInline(lines[last]));
   if (healed == lines[last]) return source;
   lines[last] = healed;
   return lines.join('\n');
@@ -279,7 +280,7 @@ String _closeDelimiters(String line) {
   var i = 0;
   while (i < text.length) {
     final char = text[i];
-    if (char != '*' && char != '_' && char != '~') {
+    if (char != '*' && char != '_' && char != '~' && char != '=') {
       i++;
       continue;
     }
@@ -290,7 +291,7 @@ String _closeDelimiters(String line) {
     var count = end - i;
     final before = i > 0 ? text[i - 1] : null;
     final after = end < text.length ? text[end] : null;
-    if (char == '~' && count != 2) {
+    if ((char == '~' || char == '=') && count != 2) {
       i = end;
       continue;
     }
@@ -338,8 +339,8 @@ String _closeDelimiters(String line) {
       }
     }
     if (count > 0 && canOpen) {
-      if (char == '~') {
-        stack.add(const _Delimiter('~', 2));
+      if (char == '~' || char == '=') {
+        stack.add(_Delimiter(char, 2));
       } else {
         if (count >= 2) {
           stack.add(_Delimiter(char, 2));
@@ -364,4 +365,17 @@ String _closeDelimiters(String line) {
   final closers = stack.reversed.map((d) => d.char * d.size).join();
   final trimmed = result.trimRight();
   return '$trimmed$closers${result.substring(trimmed.length)}';
+}
+
+final RegExp _partialTag = RegExp(r'<(?:/?[A-Za-z][A-Za-z0-9]*[^<>]*)?$');
+final RegExp _openSafeTag = RegExp(
+  r'<(sub|sup|kbd|mark|u|ins|small)>(?![^<]*</\1>)[^<]*$',
+  caseSensitive: false,
+);
+
+// "text <su" hides the half tag; "<sub>2" closes it as "<sub>2</sub>".
+String _healHtml(String line) {
+  final open = _openSafeTag.firstMatch(line);
+  if (open != null) return '$line</${open[1]}>';
+  return line.replaceFirst(_partialTag, '');
 }

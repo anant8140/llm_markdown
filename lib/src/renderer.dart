@@ -10,6 +10,8 @@ import 'fade.dart';
 import 'icons.dart';
 import 'math.dart';
 import 'safety.dart';
+import 'syntaxes.dart';
+import 'thinking.dart';
 import 'style.dart';
 
 /// Builds a widget for an image, given its address and alternative text.
@@ -78,6 +80,11 @@ class RenderSettings {
   Set<String> linkSchemes = defaultLinkSchemes;
 
   Set<String> imageSchemes = defaultImageSchemes;
+
+  ValueChanged<int>? onCitationTap;
+
+  // footnotes and headings, so "#fn-1" links can scroll to them
+  final Map<String, GlobalKey> anchors = {};
 }
 
 const Set<String> _textContainers = {
@@ -96,6 +103,7 @@ const Set<String> _textContainers = {
 
 const Set<String> _blockTags = {
   blockMathTag,
+  detailsTag,
   'p',
   'h1',
   'h2',
@@ -444,6 +452,28 @@ class _Builder {
         return Container(height: 1, color: style.dividerColor);
       case 'table':
         return _directed(element.textContent, _table(element));
+      case detailsTag:
+        return ThinkingSection(
+          label: element.attributes['summary'] ?? 'Details',
+          done: true,
+          color: style.codeBlockHeaderStyle.color ?? style.accentColor,
+          textStyle: style.textStyle.copyWith(fontWeight: FontWeight.w600),
+          initiallyExpanded: false,
+          child: blocks(element.children ?? const [], parent: element),
+        );
+      case 'div'
+          when (element.attributes['class'] ?? '').contains('markdown-alert '):
+        return _alert(element);
+      case 'section' when element.attributes['class'] == 'footnotes':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(height: 1, color: style.dividerColor),
+            SizedBox(height: style.blockSpacing / 2),
+            blocks(element.children ?? const [], parent: element),
+          ],
+        );
       default:
         return blocks(element.children ?? const [], parent: element);
     }
@@ -489,6 +519,54 @@ class _Builder {
     if (settings.showCursor) _cursor(style),
   ];
 
+  Widget _alert(md.Element alert) {
+    final type = RegExp(
+      r'markdown-alert-(\w+)',
+    ).firstMatch(alert.attributes['class']!)![1]!;
+    final color = style.alertColors[type] ?? style.accentColor;
+    final children = alert.children ?? const <md.Node>[];
+    final title = children.isEmpty ? '' : children.first.textContent;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        border: BorderDirectional(start: BorderSide(color: color, width: 4)),
+      ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(14, 8, 12, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              title,
+              style: style.textStyle.copyWith(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (children.length > 1) ...[
+              SizedBox(height: style.blockSpacing / 2),
+              blocks(children.sublist(1), parent: alert),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // sub/superscript as a lifted or lowered smaller text
+  InlineSpan _script(String text, TextStyle textStyle, {required bool up}) {
+    final size = textStyle.fontSize ?? 14;
+    return WidgetSpan(
+      alignment: PlaceholderAlignment.baseline,
+      baseline: TextBaseline.alphabetic,
+      child: Transform.translate(
+        offset: Offset(0, up ? -size * 0.35 : size * 0.2),
+        child: Text(text, style: textStyle.copyWith(fontSize: size * 0.72)),
+      ),
+    );
+  }
+
   Widget _mathBlock(String tex, {required bool closed, required bool target}) {
     final builder = settings.mathBuilder;
     if (closed && builder != null) {
@@ -496,6 +574,19 @@ class _Builder {
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: _mathSemantics(tex, builder(context, tex, true)),
+        ),
+      );
+    }
+    if (closed) {
+      // no math renderer plugged in: a readable Unicode version
+      return Center(
+        child: Text(
+          texToUnicode(tex),
+          style: style.textStyle.copyWith(
+            fontStyle: FontStyle.italic,
+            fontSize: (style.textStyle.fontSize ?? 14) * 1.1,
+          ),
+          textAlign: TextAlign.center,
         ),
       );
     }
@@ -573,8 +664,7 @@ class _Builder {
             for (final child in children) ..._inline(child, textStyle, link),
           ];
         }
-        final recognizer = recognizers.take()
-          ..onTap = () => settings.onLinkTap?.call(href);
+        final recognizer = recognizers.take()..onTap = () => _openLink(href);
         return [
           TextSpan(
             style: style.linkStyle,
@@ -601,8 +691,8 @@ class _Builder {
         if (builder == null) {
           return [
             TextSpan(
-              text: display ? '\$\$$tex\$\$' : '\$$tex\$',
-              style: style.inlineCodeStyle,
+              text: texToUnicode(tex),
+              style: const TextStyle(fontStyle: FontStyle.italic),
             ),
           ];
         }
@@ -612,6 +702,76 @@ class _Builder {
             child: _mathSemantics(tex, builder(context, tex, display)),
           ),
         ];
+      case 'sub' || 'sup' when children.every((c) => c is md.Text):
+        return [_script(node.textContent, textStyle, up: node.tag == 'sup')];
+      case 'mark':
+        return styled(
+          TextStyle(backgroundColor: style.accentColor.withValues(alpha: 0.22)),
+        );
+      case 'u' || 'ins':
+        return styled(const TextStyle(decoration: TextDecoration.underline));
+      case 'small':
+        return styled(TextStyle(fontSize: (textStyle.fontSize ?? 14) * 0.85));
+      case 'kbd':
+        return [
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: style.dividerColor),
+                color: style.tableHeaderColor,
+              ),
+              child: Text(
+                node.textContent,
+                style: style.inlineCodeStyle.copyWith(backgroundColor: null),
+              ),
+            ),
+          ),
+        ];
+      case spoilerTag:
+        return [
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: _Spoiler(
+              text: node.textContent,
+              style: textStyle,
+              cover: style.textStyle.color ?? const Color(0xFF808080),
+            ),
+          ),
+        ];
+      case citationTag:
+        final number = int.parse(node.textContent);
+        return [
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Semantics(
+              button: true,
+              label: 'Source $number',
+              excludeSemantics: true,
+              child: GestureDetector(
+                onTap: () => settings.onCitationTap?.call(number),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  decoration: BoxDecoration(
+                    color: style.accentColor.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$number',
+                    style: textStyle.copyWith(
+                      fontSize: (textStyle.fontSize ?? 14) * 0.75,
+                      color: style.accentColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ];
       case 'sup':
         return styled(TextStyle(fontSize: (textStyle.fontSize ?? 14) * 0.75));
       default:
@@ -619,6 +779,24 @@ class _Builder {
           for (final child in children) ..._inline(child, textStyle, link),
         ];
     }
+  }
+
+  // "#fn-1" scrolls to the footnote; anything else goes to onLinkTap
+  void _openLink(String href) {
+    final anchor = href.startsWith('#')
+        ? settings.anchors[href.substring(1)]?.currentContext
+        : null;
+    if (anchor != null && anchor.mounted) {
+      unawaited(
+        Scrollable.ensureVisible(
+          anchor,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        ),
+      );
+      return;
+    }
+    settings.onLinkTap?.call(href);
   }
 
   Widget _image(String? source, String? alt) {
@@ -676,14 +854,21 @@ class _Builder {
         );
       }
       number++;
+      final row = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: style.listIndent, child: marker),
+          Expanded(child: blocks(children, parent: item)),
+        ],
+      );
+      final id = item.attributes['id'];
       items.add(
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(width: style.listIndent, child: marker),
-            Expanded(child: blocks(children, parent: item)),
-          ],
-        ),
+        id == null
+            ? row
+            : KeyedSubtree(
+                key: settings.anchors.putIfAbsent(id, GlobalKey.new),
+                child: row,
+              ),
       );
     }
     _listDepth--;
@@ -797,4 +982,46 @@ class _Builder {
       ),
     );
   }
+}
+
+class _Spoiler extends StatefulWidget {
+  const _Spoiler({
+    required this.text,
+    required this.style,
+    required this.cover,
+  });
+
+  final String text;
+  final TextStyle style;
+  final Color cover;
+
+  @override
+  State<_Spoiler> createState() => _SpoilerState();
+}
+
+class _SpoilerState extends State<_Spoiler> {
+  bool _shown = false;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: !_shown,
+    label: _shown ? null : 'Spoiler, tap to show',
+    child: GestureDetector(
+      onTap: () => setState(() => _shown = !_shown),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 3),
+        decoration: BoxDecoration(
+          color: _shown ? null : widget.cover.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          widget.text,
+          style: widget.style.copyWith(
+            color: _shown ? null : const Color(0x00000000),
+          ),
+        ),
+      ),
+    ),
+  );
 }

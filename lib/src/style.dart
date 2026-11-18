@@ -13,6 +13,22 @@ const List<String> _monospaceFallback = [
 ];
 
 const Color _lightAccent = Color(0xFF1A73E8);
+
+// GitHub's alert colors
+const Map<String, Color> _lightAlerts = {
+  'note': Color(0xFF0969DA),
+  'tip': Color(0xFF1A7F37),
+  'important': Color(0xFF8250DF),
+  'warning': Color(0xFF9A6700),
+  'caution': Color(0xFFCF222E),
+};
+const Map<String, Color> _darkAlerts = {
+  'note': Color(0xFF4493F8),
+  'tip': Color(0xFF3FB950),
+  'important': Color(0xFFAB7DF8),
+  'warning': Color(0xFFD29922),
+  'caution': Color(0xFFF85149),
+};
 const Color _darkAccent = Color(0xFF8AB4F8);
 
 /// The look of a `StreamingMarkdown` widget.
@@ -46,6 +62,7 @@ class StreamingMarkdownStyle {
     required this.dividerColor,
     required this.tableHeaderColor,
     required this.accentColor,
+    this.alertColors = _lightAlerts,
     this.blockSpacing = 12,
     this.listIndent = 24,
   }) : assert(headingStyles.length == 6, 'headingStyles needs 6 styles');
@@ -120,6 +137,7 @@ class StreamingMarkdownStyle {
       dividerColor: tint(0.15),
       tableHeaderColor: tint(0.05),
       accentColor: accentColor,
+      alertColors: dark ? _darkAlerts : _lightAlerts,
     );
   }
 
@@ -175,6 +193,10 @@ class StreamingMarkdownStyle {
   /// The color of checked boxes and of the cursor shown while text arrives.
   final Color accentColor;
 
+  /// The colors of GitHub alerts, by type: `note`, `tip`, `important`,
+  /// `warning` and `caution`.
+  final Map<String, Color> alertColors;
+
   /// The space between blocks, such as paragraphs and lists.
   final double blockSpacing;
 
@@ -195,6 +217,7 @@ class StreamingMarkdownStyle {
     Color? dividerColor,
     Color? tableHeaderColor,
     Color? accentColor,
+    Map<String, Color>? alertColors,
     double? blockSpacing,
     double? listIndent,
   }) => StreamingMarkdownStyle(
@@ -210,6 +233,7 @@ class StreamingMarkdownStyle {
     dividerColor: dividerColor ?? this.dividerColor,
     tableHeaderColor: tableHeaderColor ?? this.tableHeaderColor,
     accentColor: accentColor ?? this.accentColor,
+    alertColors: alertColors ?? this.alertColors,
     blockSpacing: blockSpacing ?? this.blockSpacing,
     listIndent: listIndent ?? this.listIndent,
   );
@@ -229,6 +253,7 @@ class StreamingMarkdownStyle {
       other.dividerColor == dividerColor &&
       other.tableHeaderColor == tableHeaderColor &&
       other.accentColor == accentColor &&
+      mapEquals(other.alertColors, alertColors) &&
       other.blockSpacing == blockSpacing &&
       other.listIndent == listIndent;
 
@@ -246,6 +271,7 @@ class StreamingMarkdownStyle {
     dividerColor,
     tableHeaderColor,
     accentColor,
+    Object.hashAllUnordered(alertColors.entries.map((e) => (e.key, e.value))),
     blockSpacing,
     listIndent,
   );

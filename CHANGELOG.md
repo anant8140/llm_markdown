@@ -22,6 +22,13 @@
 * `controller.addOpenAIStream(bytes)` and `addAnthropicStream(bytes)` read
   the raw SSE response body, reasoning included; `serverSentEvents()` for
   other APIs.
+* GitHub alerts (`> [!NOTE]` ...), `<details>` sections, citation chips for
+  `[1]` (`onCitationTap`), `==highlight==`, `||spoiler||`, `:emoji:`, and a
+  few HTML tags (`<sub> <sup> <kbd> <mark> <u> <br>`).
+* Footnote references scroll to their note.
+* Without a `mathBuilder`, math shows as readable Unicode (`x²`, `α`).
+* `MarkdownSyntax` turns extensions on or off, e.g. `dollarMath: false` or
+  `autolinks: false`, and adds autolink schemes.
 
 ## 0.2.0
 
