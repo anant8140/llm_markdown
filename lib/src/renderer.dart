@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import 'code_block.dart';
+import 'code_options.dart';
 import 'direction.dart';
 import 'fade.dart';
 import 'icons.dart';
@@ -82,6 +83,8 @@ class RenderSettings {
   Set<String> imageSchemes = defaultImageSchemes;
 
   ValueChanged<int>? onCitationTap;
+
+  CodeBlockOptions codeBlocks = const CodeBlockOptions();
 
   // footnotes and headings, so "#fn-1" links can scroll to them
   final Map<String, GlobalKey> anchors = {};
@@ -911,6 +914,8 @@ class _Builder {
           ? _cursor(style.codeBlockTextStyle)
           : null,
       fadeLength: identical(pre, cursorTarget) ? settings.fadeLength : 0,
+      options: settings.codeBlocks,
+      streaming: !isComplete,
     );
   }
 

@@ -29,6 +29,13 @@
 * Without a `mathBuilder`, math shows as readable Unicode (`x²`, `α`).
 * `MarkdownSyntax` turns extensions on or off, e.g. `dollarMath: false` or
   `autolinks: false`, and adds autolink schemes.
+* `codeBlocks: CodeBlockOptions(...)`: line numbers, wrapped lines,
+  collapsing long blocks behind "Show all N lines", highlighting while a
+  block streams, a custom copy button and extra header buttons such as
+  "Run".
+* `CodeThemes` with 13 ready-made highlighting themes, and
+  `StreamingMarkdownStyle.fromColors(monospace: ...)` for your own code
+  font.
 
 ## 0.2.0
 

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+import 'code_options.dart';
 import 'controller.dart';
 import 'direction.dart';
 import 'incremental_parser.dart';
@@ -69,6 +70,7 @@ class StreamingMarkdown extends StatefulWidget {
     this.updateInterval = Duration.zero,
     this.syntax = const MarkdownSyntax(),
     this.onCitationTap,
+    this.codeBlocks = const CodeBlockOptions(),
     this.autoScrollController,
   }) : stream = null,
        text = null,
@@ -109,6 +111,7 @@ class StreamingMarkdown extends StatefulWidget {
     this.updateInterval = Duration.zero,
     this.syntax = const MarkdownSyntax(),
     this.onCitationTap,
+    this.codeBlocks = const CodeBlockOptions(),
     this.autoScrollController,
   }) : controller = null,
        text = null,
@@ -149,6 +152,7 @@ class StreamingMarkdown extends StatefulWidget {
     this.updateInterval = Duration.zero,
     this.syntax = const MarkdownSyntax(),
     this.onCitationTap,
+    this.codeBlocks = const CodeBlockOptions(),
     this.autoScrollController,
   }) : controller = null,
        stream = null;
@@ -280,6 +284,10 @@ class StreamingMarkdown extends StatefulWidget {
 
   /// Called with the number of a tapped citation chip, e.g. 1 for `[1]`.
   final ValueChanged<int>? onCitationTap;
+
+  /// Line numbers, wrapping, collapsing long blocks, highlighting while
+  /// streaming, and custom header buttons for code blocks.
+  final CodeBlockOptions codeBlocks;
 
   /// The scroll controller of the list that holds this widget.
   ///
@@ -590,6 +598,11 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
         widget.highlightCode != _settings.highlightCode ||
         widget.newlinesAsBreaks != _settings.newlinesAsBreaks ||
         widget.detectTextDirection != _settings.detectTextDirection ||
+        // builders may be new closures on every build; only layout counts
+        widget.codeBlocks.lineNumbers != _settings.codeBlocks.lineNumbers ||
+        widget.codeBlocks.wrapLines != _settings.codeBlocks.wrapLines ||
+        widget.codeBlocks.collapseAfterLines !=
+            _settings.codeBlocks.collapseAfterLines ||
         !setEquals(widget.allowedLinkSchemes, _settings.linkSchemes) ||
         !setEquals(widget.allowedImageSchemes, _settings.imageSchemes);
     _settings
@@ -604,6 +617,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       ..fadeLength = _smoothing.fadeLength
       ..cursorStyle = widget.cursorStyle
       ..onCitationTap = widget.onCitationTap
+      ..codeBlocks = widget.codeBlocks
       ..linkSchemes = widget.allowedLinkSchemes
       ..imageSchemes = widget.allowedImageSchemes
       ..detectTextDirection = widget.detectTextDirection;

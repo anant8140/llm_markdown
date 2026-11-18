@@ -7,6 +7,12 @@ library;
 
 export 'src/adapters.dart'
     show ModelStreamError, ModelStreams, ServerSentEvent, serverSentEvents;
+export 'src/code_options.dart'
+    show
+        CodeActionsBuilder,
+        CodeBlockOptions,
+        CodeCopyButtonBuilder,
+        CodeThemes;
 export 'src/controller.dart' show StreamingMarkdownController;
 export 'src/extras.dart' show CopyReplyButton, MarkdownShimmer;
 export 'src/healer.dart' show healIncompleteMarkdown;

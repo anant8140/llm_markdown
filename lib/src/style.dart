@@ -73,10 +73,15 @@ class StreamingMarkdownStyle {
   /// Surfaces and borders are tints of the text color, so the style suits
   /// any background. [brightness] chooses the code highlighting colors; it
   /// is worked out from the text color when not given.
+  ///
+  /// [monospace] sets the font for code, e.g.
+  /// `GoogleFonts.jetBrainsMono()`. On the web there is no built-in
+  /// monospace font, so passing one there is a good idea.
   factory StreamingMarkdownStyle.fromColors({
     required TextStyle textStyle,
     required Color accentColor,
     Brightness? brightness,
+    TextStyle? monospace,
   }) {
     final dark =
         (brightness ??
@@ -90,12 +95,13 @@ class StreamingMarkdownStyle {
     final body = textStyle.copyWith(color: text, height: 1.5);
     final fontSize = body.fontSize ?? 14;
     Color tint(double alpha) => text.withValues(alpha: alpha);
-    final monospace = TextStyle(
-      fontFamily: 'monospace',
-      fontFamilyFallback: _monospaceFallback,
-      fontSize: fontSize * 0.9,
-      color: text,
-    );
+    final mono =
+        (monospace ??
+                const TextStyle(
+                  fontFamily: 'monospace',
+                  fontFamilyFallback: _monospaceFallback,
+                ))
+            .copyWith(fontSize: fontSize * 0.9, color: text);
     TextStyle heading(double scale, FontWeight weight) => body.copyWith(
       fontSize: fontSize * scale,
       fontWeight: weight,
@@ -111,8 +117,8 @@ class StreamingMarkdownStyle {
         heading(1, FontWeight.w600),
         heading(0.9, FontWeight.w600),
       ],
-      inlineCodeStyle: monospace.copyWith(backgroundColor: tint(0.08)),
-      codeBlockTextStyle: monospace.copyWith(height: 1.45),
+      inlineCodeStyle: mono.copyWith(backgroundColor: tint(0.08)),
+      codeBlockTextStyle: mono.copyWith(height: 1.45),
       codeBlockDecoration: BoxDecoration(
         color: tint(0.05),
         borderRadius: BorderRadius.circular(12),
