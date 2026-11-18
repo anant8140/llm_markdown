@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 
 import 'controller.dart';
 import 'direction.dart';
@@ -457,12 +457,19 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     if (text.isEmpty) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      // SemanticsService.announce is deprecated and its replacement,
+      // sendAnnouncement, isn't in Flutter 3.35 yet, so the announce event
+      // goes to the engine directly. Older engines ignore the view id.
+      final direction = detectTextDirection(text) ?? Directionality.of(context);
       unawaited(
-        SemanticsService.sendAnnouncement(
-          View.of(context),
-          text,
-          detectTextDirection(text) ?? Directionality.of(context),
-        ),
+        SystemChannels.accessibility.send(<String, Object>{
+          'type': 'announce',
+          'data': <String, Object>{
+            'viewId': View.of(context).viewId,
+            'message': text,
+            'textDirection': direction.index,
+          },
+        }),
       );
     });
   }
