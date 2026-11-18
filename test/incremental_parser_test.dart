@@ -128,6 +128,19 @@ void main() {
     expect(_frozenHtml(parser).first, contains('href="https://dart.dev"'));
   });
 
+  test('footnotes resolve across blocks', () {
+    const text = 'See[^1] here.\n\nMore text.\n\n[^1]: The note.\n';
+    final parser = IncrementalMarkdownParser();
+    var received = '';
+    for (final char in text.split('')) {
+      received += char;
+      parser.update(received, complete: false);
+    }
+    parser.update(received, complete: true);
+    expect(_frozenHtml(parser), _oneShot(text));
+    expect(_frozenHtml(parser).join(), contains('footnote-ref'));
+  });
+
   test('text that does not extend the previous text is parsed again', () {
     final parser = IncrementalMarkdownParser()
       ..update('# One\n\nfirst', complete: false);

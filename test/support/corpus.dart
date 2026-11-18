@@ -139,6 +139,14 @@ and the paragraph goes on.
 
 #
 ''',
+  'html block holding a heading': '''
+<div>
+# not a heading, still html
+</div>
+After the html.
+''',
+  'non-breaking space is not a blank line':
+      'First line\n\u00a0\nstill the same paragraph\n\nNext paragraph\n',
   'list ends with unindented text after blank line': '''
 - one
 - two

@@ -44,6 +44,16 @@ void main() {
     '## ': '',
     'Steps:\n1.': 'Steps:\n',
     '> ': '',
+    // CRLF text heals like LF text.
+    '| a | b |\r\n|---|---|\r\n| 1 | 2 |\r\n| 3 | 4':
+        '| a | b |\n|---|---|\n| 1 | 2 |\n',
+    'Steps:\r\n#\r': 'Steps:\n',
+    'foo `\r': 'foo ',
+    // Ordinary text that only looks like the start of something.
+    'Born in\n1990': 'Born in\n1990',
+    'Steps:\n12': 'Steps:\n',
+    '2*3': '2*3',
+    'x * y': 'x * y',
     // Complete Markdown stays as it is.
     '# Title\n\nSome **bold** text.\n': '# Title\n\nSome **bold** text.\n',
     'x\n\n': 'x\n\n',

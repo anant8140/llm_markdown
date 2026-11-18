@@ -1,10 +1,6 @@
-// Finds the places where streamed Markdown can be cut into blocks that parse
-// the same way whatever text arrives after them.
-//
-// A cut is only reported when it is certain. Anything that a later character
-// could still change stays in the open block, which is parsed again on every
-// update. Being too careful only costs time; cutting too early would show
-// the wrong result, so every rule here errs towards not cutting.
+// Splits streamed markdown into blocks that can't change any more.
+// When unsure, don't cut. A missed cut costs a re-parse, a wrong one shows
+// the wrong output.
 
 final RegExp _listMarker = RegExp(r'^ {0,3}(?:[-+*]|\d{1,9}[.)])(?:[ \t]|$)');
 final RegExp _partialListMarker = RegExp(r'^ {0,3}(?:[-+*]|\d{1,9}[.)]?)$');
@@ -16,26 +12,24 @@ final RegExp _htmlRawBlock = RegExp(
   r'^ {0,3}<(?:(script|pre|style|textarea)(?=[\s>]|$)|(!--)|(\?)|(![A-Za-z])|(!\[CDATA\[))',
   caseSensitive: false,
 );
+// <div> and friends run until a blank line, headings inside included.
+final RegExp _htmlBlock = RegExp(
+  r'^ {0,3}</?[A-Za-z][A-Za-z0-9-]*(?:[\s/>]|$)',
+);
 final RegExp _htmlRawTagEnd = RegExp(
   r'</(?:script|pre|style|textarea)>',
   caseSensitive: false,
 );
 
-/// A fenced code block that has been opened and not yet closed.
 class OpenFence {
-  /// Creates an open fence with its indentation and fence characters.
   const OpenFence(this.indent, this.marker);
 
-  /// The spaces before the opening fence.
   final String indent;
 
-  /// The fence characters, such as ```` ``` ```` or `~~~~`.
   final String marker;
 
-  /// The fence character, a backtick or a tilde.
   String get char => marker[0];
 
-  /// Whether [line] closes this fence.
   bool isClosedBy(String line) {
     final match = _fenceCloser.firstMatch(line);
     if (match == null) return false;
@@ -44,7 +38,6 @@ class OpenFence {
   }
 }
 
-/// Returns the fence that [line] opens, or null when it opens none.
 OpenFence? fenceOpenedBy(String line) {
   final match = _fenceOpener.firstMatch(line);
   if (match == null) return null;
@@ -53,7 +46,10 @@ OpenFence? fenceOpenedBy(String line) {
   return OpenFence(match[1]!, marker);
 }
 
-/// Removes a trailing carriage return, so CRLF text is handled like LF text.
+bool isBlank(String text) => _blank.hasMatch(text);
+
+final RegExp _blank = RegExp(r'^[ \t\r\n]*$');
+
 String withoutCarriageReturn(String line) =>
     line.endsWith('\r') ? line.substring(0, line.length - 1) : line;
 
@@ -80,13 +76,6 @@ RegExp _htmlEndFor(RegExpMatch start) {
   return RegExp(r'\]\]>');
 }
 
-/// Returns the offsets in [text], after [start], where a new independent
-/// block begins.
-///
-/// The text from [start] to the first offset, and between two offsets, can
-/// be parsed on its own and will never need to be parsed again. When
-/// [complete] is false the last line may still grow, so decisions that
-/// depend on it are postponed.
 List<int> findBlockBoundaries(
   String text,
   int start, {
@@ -95,10 +84,11 @@ List<int> findBlockBoundaries(
   final boundaries = <int>[];
   var pos = start;
   var hasContent = false;
-  // Whether the current block holds something that a later indented line or
-  // list item could still continue: a list, a footnote or indented code.
+  // list / footnote / indented code: an indented line after a blank line
+  // still belongs to it.
   var continuable = false;
   var afterBlank = false;
+  var inHtmlBlock = false;
   OpenFence? fence;
   RegExp? htmlEnd;
 
@@ -109,6 +99,7 @@ List<int> findBlockBoundaries(
     hasContent = false;
     continuable = false;
     afterBlank = false;
+    inHtmlBlock = false;
   }
 
   while (pos < text.length) {
@@ -135,10 +126,9 @@ List<int> findBlockBoundaries(
       continue;
     }
 
-    if (line.trim().isEmpty) {
-      // A partial line of spaces is the last line, so no cut can follow it
-      // in this update; treating it as blank is safe.
+    if (isBlank(line)) {
       if (hasContent) afterBlank = true;
+      inHtmlBlock = false;
       pos = next;
       continue;
     }
@@ -151,7 +141,6 @@ List<int> findBlockBoundaries(
       } else if (indent > 0 ||
           _listMarker.hasMatch(line) ||
           _footnoteDefinition.hasMatch(line)) {
-        // The list, footnote or indented code continues.
         afterBlank = false;
       } else if (!lineComplete && _partialListMarker.hasMatch(line)) {
         break;
@@ -160,14 +149,13 @@ List<int> findBlockBoundaries(
       }
     }
 
-    // Inside a list, an indented fence or heading belongs to a list item.
+    // indented fence/heading inside a list belongs to the item
     final nested = continuable && indent > 0;
 
-    if (indent <= 3 && !nested) {
+    if (indent <= 3 && !nested && !inHtmlBlock) {
       final opener = _fenceOpener.firstMatch(line);
       if (opener != null) {
-        // A backtick fence is only a fence if its info string has no
-        // backtick, which the rest of the line could still add.
+        // ```foo``` is inline code, wait for the whole line
         if (opener[2]![0] == '`' && !lineComplete) break;
         final opened = fenceOpenedBy(line);
         if (opened != null) {
@@ -180,7 +168,7 @@ List<int> findBlockBoundaries(
       }
 
       final heading = _atxHeading.firstMatch(line);
-      // "#" alone may still become "#tag", which is not a heading.
+      // "#" could still become "#tag"
       if (heading != null && (heading[1]!.isNotEmpty || lineComplete)) {
         if (hasContent) startBlockAt(pos);
         if (hasNewline) {
@@ -200,6 +188,8 @@ List<int> findBlockBoundaries(
         pos = next;
         continue;
       }
+
+      if (_htmlBlock.hasMatch(line)) inHtmlBlock = true;
     }
 
     if (indent >= 4 ||

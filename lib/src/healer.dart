@@ -1,7 +1,7 @@
 import 'block_splitter.dart';
 
 final RegExp _partialMarkerLine = RegExp(
-  r'^[ \t]*(?:`{1,2}|~{1,2}|#{1,6}|[-+*]|\d{1,9}[.)]?|>)[ \t]*$',
+  r'^[ \t]*(?:`{1,2}|~{1,2}|#{1,6}|[-+*]|\d{1,2}[.)]?|\d{3,9}[.)]|>)[ \t]*$',
 );
 final RegExp _tableDelimiterRow = RegExp(
   r'^ {0,3}\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$',
@@ -28,6 +28,11 @@ final RegExp _wordCharacter = RegExp(r'[\p{L}\p{N}]', unicode: true);
 /// Complete Markdown is returned unchanged. Call this only while the text is
 /// still arriving: once it is complete, parse it as it is.
 String healIncompleteMarkdown(String source) {
+  if (source.contains('\r')) {
+    // a chunk can end between \r and \n
+    source = source.replaceAll('\r\n', '\n');
+    if (source.endsWith('\r')) source = source.substring(0, source.length - 1);
+  }
   if (source.isEmpty) return source;
   final lines = source.split('\n');
   final endsWithNewline = source.endsWith('\n');
@@ -52,7 +57,7 @@ String healIncompleteMarkdown(String source) {
 
   var last = lines.length - 1;
   if (endsWithNewline) last--;
-  if (last < 0 || lines[last].trim().isEmpty) return source;
+  if (last < 0 || isBlank(lines[last])) return source;
   final partial = !endsWithNewline;
 
   final keep = _linesBeforeIncompleteTable(lines, last, partial);
@@ -82,12 +87,12 @@ String _closeFence(
     final lastIndex = body.length - 1;
     final last = withoutCarriageReturn(body[lastIndex]);
     if (lastIndex == fenceLine) {
-      // Hide a half-typed info string such as "pyth".
+      // don't show "pyth" as the language
       body[lastIndex] = '${fence.indent}${fence.marker}';
     } else if (RegExp(
       '^ {0,3}${RegExp.escape(fence.char)}+\$',
     ).hasMatch(last)) {
-      // A closing fence that is still being typed.
+      // closing fence being typed
       body.removeLast();
     }
   }
@@ -96,8 +101,6 @@ String _closeFence(
   return '$text${fence.indent}${fence.marker}';
 }
 
-/// Returns how many lines to keep when the end of [lines] is a table that
-/// cannot be shown yet, or null when nothing has to be hidden.
 int? _linesBeforeIncompleteTable(List<String> lines, int last, bool partial) {
   bool isRow(int i) => i >= 0 && lines[i].trimLeft().startsWith('|');
 
@@ -106,19 +109,18 @@ int? _linesBeforeIncompleteTable(List<String> lines, int last, bool partial) {
       _partialTableDelimiter.hasMatch(lines[last]) &&
       isRow(last - 1) &&
       !_isTableBody(lines, last - 1)) {
-    // The delimiter row under the header is still being typed.
+    // delimiter row being typed
     return last - 1;
   }
   if (!isRow(last)) return null;
   if (_isTableBody(lines, last)) return partial ? last : null;
   if (last == 0 || !isRow(last - 1)) {
-    // A lone row may be a header that is waiting for its delimiter row.
+    // maybe a header, wait for the delimiter row
     return last;
   }
   return null;
 }
 
-/// Whether line [index] comes after a table's header and delimiter rows.
 bool _isTableBody(List<String> lines, int index) {
   for (var i = index - 1; i >= 1; i--) {
     final line = lines[i];
@@ -131,13 +133,10 @@ bool _isTableBody(List<String> lines, int index) {
 class _Masked {
   _Masked(this.text, this.openCodeStart, this.openCodeLength);
 
-  /// The line with code spans and escaped characters replaced by \u0001.
   final String text;
 
-  /// Where an unclosed code span starts, or -1.
   final int openCodeStart;
 
-  /// The number of backticks that opened the unclosed code span.
   final int openCodeLength;
 }
 
@@ -197,13 +196,12 @@ _Masked _mask(String line) {
   return _Masked(String.fromCharCodes(units), openStart, openLength);
 }
 
-/// Heals one line of inline Markdown. See [healIncompleteMarkdown].
 String healIncompleteInline(String line) => _closeDelimiters(_healLinks(line));
 
 String _healLinks(String line) {
   final masked = _mask(line).text;
 
-  // "[text](https://exa" shows "text" until the address is complete.
+  // [text](https://exa -> text
   final destination = masked.lastIndexOf('](');
   if (destination != -1 && !masked.contains(')', destination)) {
     final start = _matchingOpenBracket(masked, destination);
@@ -215,7 +213,7 @@ String _healLinks(String line) {
     }
   }
 
-  // "[text" without "]" shows "text"; "![alt" is hidden.
+  // [text -> text, ![alt -> nothing
   final open = <int>[];
   for (var i = 0; i < masked.length; i++) {
     final char = masked[i];
@@ -285,13 +283,21 @@ String _closeDelimiters(String line) {
     }
     var canOpen = after != null && !_isSpace(after);
     var canClose = before != null && !_isSpace(before);
+    // 2*3 is usually math, not emphasis
+    if (char == '*' &&
+        before != null &&
+        after != null &&
+        _wordCharacter.hasMatch(before) &&
+        _wordCharacter.hasMatch(after)) {
+      canOpen = false;
+    }
     if (char == '_') {
       if (before != null && _wordCharacter.hasMatch(before)) canOpen = false;
       if (after != null && _wordCharacter.hasMatch(after)) canClose = false;
     }
 
     if (after == null) {
-      // The last run: keep it only if it closes what is open.
+      // trailing run: keep it only if it closes something
       var remaining = count;
       var depth = stack.length;
       while (canClose &&
@@ -335,7 +341,6 @@ String _closeDelimiters(String line) {
   var result = dangling == null ? line : line.substring(0, dangling);
   if (masked.openCodeStart != -1) {
     if (masked.openCodeStart + masked.openCodeLength == line.length) {
-      // Only the opening backticks have arrived.
       result = line.substring(0, masked.openCodeStart);
     } else {
       result = '$result${'`' * masked.openCodeLength}';
