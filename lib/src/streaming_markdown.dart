@@ -3,8 +3,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/semantics.dart';
 
 import 'controller.dart';
+import 'direction.dart';
 import 'incremental_parser.dart';
 import 'renderer.dart';
 import 'smoothing.dart';
@@ -50,6 +52,8 @@ class StreamingMarkdown extends StatefulWidget {
     this.showThinking = true,
     this.thinkingInitiallyExpanded = false,
     this.thinkingLabel,
+    this.announceWhenDone = true,
+    this.detectTextDirection = true,
     this.autoScrollController,
   }) : stream = null,
        text = null,
@@ -76,6 +80,8 @@ class StreamingMarkdown extends StatefulWidget {
     this.showThinking = true,
     this.thinkingInitiallyExpanded = false,
     this.thinkingLabel,
+    this.announceWhenDone = true,
+    this.detectTextDirection = true,
     this.autoScrollController,
   }) : controller = null,
        text = null,
@@ -102,6 +108,8 @@ class StreamingMarkdown extends StatefulWidget {
     this.showThinking = true,
     this.thinkingInitiallyExpanded = false,
     this.thinkingLabel,
+    this.announceWhenDone = true,
+    this.detectTextDirection = true,
     this.autoScrollController,
   }) : controller = null,
        stream = null;
@@ -175,6 +183,19 @@ class StreamingMarkdown extends StatefulWidget {
   /// "Thought for 12s". Use it to translate the title.
   final ThinkingLabelBuilder? thinkingLabel;
 
+  /// Whether screen readers read the reply out once it is complete.
+  ///
+  /// The part that is still arriving is hidden from screen readers, so they
+  /// don't read half sentences; when the reply ends the whole text is
+  /// announced. Replies that are already complete when shown aren't.
+  final bool announceWhenDone;
+
+  /// Whether each paragraph, list, quote and table takes its direction from
+  /// its first letter, like `dir="auto"` on the web. An Arabic or Hebrew reply
+  /// then reads right to left even in a left-to-right app. Code always reads
+  /// left to right.
+  final bool detectTextDirection;
+
   /// The scroll controller of the list that holds this widget.
   ///
   /// When given, the list keeps following the end of the text as it grows,
@@ -196,6 +217,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
   final Map<int, Widget> _thinkingWidgets = {};
   DateTime? _thinkingStarted;
   Duration? _thinkingTook;
+  bool _sawStreaming = false;
 
   late final Ticker _ticker = createTicker(_onTick);
   late StreamingMarkdownController _controller;
@@ -288,6 +310,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     _thinkingWidgets.clear();
     _thinkingStarted = null;
     _thinkingTook = null;
+    _sawStreaming = false;
   }
 
   @override
@@ -389,7 +412,8 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     final changed =
         style != _settings.style ||
         widget.highlightCode != _settings.highlightCode ||
-        widget.newlinesAsBreaks != _settings.newlinesAsBreaks;
+        widget.newlinesAsBreaks != _settings.newlinesAsBreaks ||
+        widget.detectTextDirection != _settings.detectTextDirection;
     _settings
       ..style = style
       ..onLinkTap = widget.onLinkTap
@@ -399,7 +423,8 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       ..newlinesAsBreaks = widget.newlinesAsBreaks
       ..mathBuilder = widget.mathBuilder
       ..showCursor = widget.showCursor
-      ..fadeLength = widget.smoothing.fadeLength;
+      ..fadeLength = widget.smoothing.fadeLength
+      ..detectTextDirection = widget.detectTextDirection;
     if (changed) {
       _blockWidgets.clear();
       _thinkingWidgets.clear();
@@ -415,6 +440,31 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     } else if (_thinkingTook == null && _thinkingStarted != null) {
       _thinkingTook = DateTime.now().difference(_thinkingStarted!);
     }
+  }
+
+  void _announceWhenDone(bool complete) {
+    if (!complete) {
+      _sawStreaming = true;
+      return;
+    }
+    if (!_sawStreaming) return;
+    _sawStreaming = false;
+    if (!widget.announceWhenDone) return;
+    final text = [
+      for (final block in _parser.frozenBlocks)
+        for (final node in block.nodes) node.textContent,
+    ].join('\n').trim();
+    if (text.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        SemanticsService.sendAnnouncement(
+          View.of(context),
+          text,
+          detectTextDirection(text) ?? Directionality.of(context),
+        ),
+      );
+    });
   }
 
   ({List<Widget> widgets, bool hasTarget}) _blocks(
@@ -447,12 +497,16 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     final target = streaming ? findCursorTarget(open) : null;
     if (open.isNotEmpty) {
       widgets.add(
-        MarkdownBlockView(
-          key: const ValueKey<String>('open'),
-          nodes: open,
-          settings: _settings,
-          isComplete: false,
-          cursorTarget: target,
+        // half sentences are not read out; see announceWhenDone
+        ExcludeSemantics(
+          excluding: streaming,
+          child: MarkdownBlockView(
+            key: const ValueKey<String>('open'),
+            nodes: open,
+            settings: _settings,
+            isComplete: false,
+            cursorTarget: target,
+          ),
         ),
       );
     }
@@ -497,6 +551,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     if (changed) _followEnd();
 
     final streaming = !complete;
+    _announceWhenDone(complete);
     final answer = _blocks(
       _parser,
       _blockWidgets,

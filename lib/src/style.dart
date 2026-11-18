@@ -108,7 +108,9 @@ class StreamingMarkdownStyle {
       ),
       codeTheme: dark ? atomOneDarkTheme : atomOneLightTheme,
       blockquoteDecoration: BoxDecoration(
-        border: Border(left: BorderSide(color: tint(0.2), width: 4)),
+        border: BorderDirectional(
+          start: BorderSide(color: tint(0.2), width: 4),
+        ),
       ),
       linkStyle: TextStyle(
         color: accentColor,

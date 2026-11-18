@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import 'code_block.dart';
+import 'direction.dart';
 import 'fade.dart';
 import 'icons.dart';
 import 'math.dart';
@@ -51,6 +52,8 @@ class RenderSettings {
   bool showCursor = true;
 
   int fadeLength = 0;
+
+  bool detectTextDirection = true;
 }
 
 const Set<String> _textContainers = {
@@ -330,21 +333,24 @@ class _Builder {
           ),
         );
       case 'blockquote':
-        return DecoratedBox(
-          decoration: style.blockquoteDecoration,
-          child: Padding(
-            padding: const EdgeInsetsDirectional.only(start: 14),
-            child: blocks(element.children ?? const [], parent: element),
+        return _directed(
+          element.textContent,
+          DecoratedBox(
+            decoration: style.blockquoteDecoration,
+            child: Padding(
+              padding: const EdgeInsetsDirectional.only(start: 14),
+              child: blocks(element.children ?? const [], parent: element),
+            ),
           ),
         );
       case 'ul' || 'ol':
-        return _list(element);
+        return _directed(element.textContent, _list(element));
       case 'pre':
         return _codeBlock(element);
       case 'hr':
         return Container(height: 1, color: style.dividerColor);
       case 'table':
-        return _table(element);
+        return _directed(element.textContent, _table(element));
       default:
         return blocks(element.children ?? const [], parent: element);
     }
@@ -364,8 +370,25 @@ class _Builder {
         style: textStyle,
         children: cursor ? _streamingTail(spans, textStyle) : spans,
       ),
+      textDirection: _direction(nodes.map((n) => n.textContent).join()),
     );
   }
+
+  TextDirection? _direction(String text) =>
+      settings.detectTextDirection ? detectTextDirection(text) : null;
+
+  Widget _directed(String text, Widget child) {
+    final direction = _direction(text);
+    return direction == null
+        ? child
+        : Directionality(textDirection: direction, child: child);
+  }
+
+  // Screen readers get the TeX source rather than the drawn glyphs.
+  Widget _mathSemantics(String tex, Widget child) => Semantics(
+    label: tex,
+    child: ExcludeSemantics(child: child),
+  );
 
   // Fade-in and cursor at the end of the text that is still arriving.
   List<InlineSpan> _streamingTail(List<InlineSpan> spans, TextStyle style) => [
@@ -379,7 +402,7 @@ class _Builder {
       return Center(
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: builder(context, tex, true),
+          child: _mathSemantics(tex, builder(context, tex, true)),
         ),
       );
     }
@@ -487,7 +510,7 @@ class _Builder {
         return [
           WidgetSpan(
             alignment: PlaceholderAlignment.middle,
-            child: builder(context, tex, display),
+            child: _mathSemantics(tex, builder(context, tex, display)),
           ),
         ];
       case 'sup':

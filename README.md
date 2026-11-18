@@ -30,6 +30,9 @@ This package fixes that:
 - Reasoning from `<think>...</think>` (DeepSeek, Qwen, ...) or from a separate
   reasoning stream goes into a collapsible "Thought for 12s" section.
 - The newest characters fade in as they appear.
+- Screen readers don't read half sentences; the reply is announced once
+  it's done. Arabic, Hebrew and other right-to-left text gets the right
+  direction per paragraph, even in a left-to-right app.
 - Optional auto-scroll that stops when the user scrolls up to read.
 - Depends only on `flutter/widgets.dart`, so it works with `material_ui`, the
   old `flutter/material.dart`, Cupertino or no design library at all.
@@ -150,6 +153,8 @@ selectable. With `ListView(reverse: true)` you don't need
 | `showCursor` | `true` | blinking cursor while streaming |
 | `newlinesAsBreaks` | `false` | treat a single newline as a line break |
 | `autoScrollController` | – | follow the reply while at the bottom |
+| `announceWhenDone` | `true` | screen readers read the reply when it ends |
+| `detectTextDirection` | `true` | per-paragraph direction from the first letter |
 
 ### Styling
 
@@ -169,6 +174,20 @@ StreamingMarkdown(
 
 `healIncompleteMarkdown()` is exported too, in case you want the healing
 with a different renderer.
+
+## Performance
+
+A 12,800-character reply streamed in 12-character chunks every 16 ms, on a
+Mac Studio in profile mode:
+
+| | build avg | build p90 | worst frame |
+| --- | --- | --- | --- |
+| llm_markdown | 0.65 ms | 1.56 ms | 16.0 ms |
+| `MarkdownBody` with the whole text per chunk | 6.01 ms | 12.53 ms | 16.1 ms |
+
+Phones are slower, so expect both columns to be several times higher there.
+To run it yourself: `flutter run --profile -t lib/benchmark.dart` in
+`example/`.
 
 ## How it works
 
