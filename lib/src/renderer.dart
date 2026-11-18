@@ -37,6 +37,21 @@ typedef MarkdownCodeBlockBuilder =
 typedef MarkdownMathBuilder =
     Widget Function(BuildContext context, String tex, bool display);
 
+/// The shape of the cursor shown while text arrives.
+enum StreamingCursorStyle {
+  /// A solid block, like a terminal.
+  block,
+
+  /// A thin vertical bar.
+  bar,
+
+  /// A line under where the next letter goes.
+  underline,
+
+  /// Three dots that light up in turn.
+  dots,
+}
+
 class RenderSettings {
   StreamingMarkdownStyle? style;
 
@@ -55,6 +70,8 @@ class RenderSettings {
   bool showCursor = true;
 
   int fadeLength = 0;
+
+  StreamingCursorStyle cursorStyle = StreamingCursorStyle.block;
 
   bool detectTextDirection = true;
 
@@ -202,11 +219,18 @@ class _MarkdownBlockViewState extends State<MarkdownBlockView> {
 }
 
 class StreamingCursor extends StatefulWidget {
-  const StreamingCursor({super.key, required this.color, this.fontSize = 14});
+  const StreamingCursor({
+    super.key,
+    required this.color,
+    this.fontSize = 14,
+    this.style = StreamingCursorStyle.block,
+  });
 
   final Color color;
 
   final double fontSize;
+
+  final StreamingCursorStyle style;
 
   @override
   State<StreamingCursor> createState() => _StreamingCursorState();
@@ -239,20 +263,68 @@ class _StreamingCursorState extends State<StreamingCursor>
   }
 
   @override
-  Widget build(BuildContext context) => ExcludeSemantics(
-    child: FadeTransition(
-      opacity: Tween<double>(begin: 1, end: 0.25).animate(_blink),
-      child: Container(
-        width: widget.fontSize * 0.5,
-        height: widget.fontSize * 1.05,
-        margin: const EdgeInsetsDirectional.only(start: 2),
-        decoration: BoxDecoration(
-          color: widget.color,
-          borderRadius: BorderRadius.circular(1.5),
+  Widget build(BuildContext context) {
+    final size = widget.fontSize;
+    final color = widget.color;
+    if (widget.style == StreamingCursorStyle.dots) {
+      return ExcludeSemantics(
+        child: AnimatedBuilder(
+          animation: _blink,
+          builder: (context, _) => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < 3; i++)
+                Container(
+                  width: size * 0.28,
+                  height: size * 0.28,
+                  margin: EdgeInsetsDirectional.only(start: size * 0.12),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: color.withValues(alpha: _dotAlpha(i, _blink.value)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+    final (width, height, alignment) = switch (widget.style) {
+      StreamingCursorStyle.bar => (size * 0.12, size * 1.15, Alignment.center),
+      StreamingCursorStyle.underline => (
+        size * 0.6,
+        size * 0.12,
+        Alignment.bottomCenter,
+      ),
+      _ => (size * 0.5, size * 1.05, Alignment.center),
+    };
+    return ExcludeSemantics(
+      child: FadeTransition(
+        opacity: Tween<double>(begin: 1, end: 0.25).animate(_blink),
+        child: SizedBox(
+          height: size * 1.15,
+          child: Align(
+            alignment: alignment,
+            widthFactor: 1,
+            child: Container(
+              width: width,
+              height: height,
+              margin: const EdgeInsetsDirectional.only(start: 2),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(1.5),
+              ),
+            ),
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
+
+  // each dot is brightest in its own third of the blink cycle
+  double _dotAlpha(int index, double value) {
+    final phase = (value * 3 - index).abs();
+    return phase < 1 ? 1 - phase * 0.7 : 0.3;
+  }
 }
 
 class _Builder {
@@ -278,6 +350,7 @@ class _Builder {
     child: StreamingCursor(
       color: style.accentColor,
       fontSize: textStyle.fontSize ?? 14,
+      style: settings.cursorStyle,
     ),
   );
 

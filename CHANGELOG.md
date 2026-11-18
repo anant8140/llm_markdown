@@ -14,6 +14,14 @@
   token, `errorBuilder` with `controller.completeWithError`, and
   `onComplete` / `onTextChanged`.
 * "Reduce motion" turns off the reveal, fade and blinking.
+* `controller.pause()`, `resume()`, `skipAnimation()` and `replay()`.
+* Reveal presets: `Smoothing.gentle()`, `.fast()`, `.typewriter()` and
+  `.wordByWord()` (`RevealUnit.word`).
+* Cursor styles (`StreamingCursorStyle`: block, bar, underline, dots),
+  `fadeBottomEdge` and `updateInterval`.
+* `controller.addOpenAIStream(bytes)` and `addAnthropicStream(bytes)` read
+  the raw SSE response body, reasoning included; `serverSentEvents()` for
+  other APIs.
 
 ## 0.2.0
 

@@ -29,6 +29,9 @@ class StreamingMarkdownController extends ChangeNotifier {
   int _generation = 0;
   String _thinking = '';
   Object? _error;
+  bool _paused = false;
+  int _skips = 0;
+  int _replays = 0;
   StackTrace? _stackTrace;
 
   /// All Markdown received so far.
@@ -91,6 +94,42 @@ class StreamingMarkdownController extends ChangeNotifier {
   void complete() {
     if (_isComplete) return;
     _isComplete = true;
+    notifyListeners();
+  }
+
+  /// Whether revealing the text is paused; see [pause].
+  bool get isPaused => _paused;
+
+  /// How often [skipAnimation] was called; widgets compare it to react.
+  int get skipCount => _skips;
+
+  /// How often [replay] was called; widgets compare it to react.
+  int get replayCount => _replays;
+
+  /// Stops revealing text. Text keeps arriving and is shown on [resume].
+  void pause() {
+    if (_paused) return;
+    _paused = true;
+    notifyListeners();
+  }
+
+  /// Continues revealing text after [pause].
+  void resume() {
+    if (!_paused) return;
+    _paused = false;
+    notifyListeners();
+  }
+
+  /// Shows everything that has arrived at once, skipping the reveal.
+  void skipAnimation() {
+    _skips++;
+    notifyListeners();
+  }
+
+  /// Reveals the reply again from the start, for example after the user
+  /// scrolled back to an old message.
+  void replay() {
+    _replays++;
     notifyListeners();
   }
 

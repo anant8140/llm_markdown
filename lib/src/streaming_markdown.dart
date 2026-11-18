@@ -63,6 +63,9 @@ class StreamingMarkdown extends StatefulWidget {
     this.errorBuilder,
     this.onComplete,
     this.onTextChanged,
+    this.cursorStyle = StreamingCursorStyle.block,
+    this.fadeBottomEdge = false,
+    this.updateInterval = Duration.zero,
     this.autoScrollController,
   }) : stream = null,
        text = null,
@@ -98,6 +101,9 @@ class StreamingMarkdown extends StatefulWidget {
     this.errorBuilder,
     this.onComplete,
     this.onTextChanged,
+    this.cursorStyle = StreamingCursorStyle.block,
+    this.fadeBottomEdge = false,
+    this.updateInterval = Duration.zero,
     this.autoScrollController,
   }) : controller = null,
        text = null,
@@ -133,6 +139,9 @@ class StreamingMarkdown extends StatefulWidget {
     this.errorBuilder,
     this.onComplete,
     this.onTextChanged,
+    this.cursorStyle = StreamingCursorStyle.block,
+    this.fadeBottomEdge = false,
+    this.updateInterval = Duration.zero,
     this.autoScrollController,
   }) : controller = null,
        stream = null;
@@ -246,6 +255,17 @@ class StreamingMarkdown extends StatefulWidget {
   /// Called after the shown text changes, with the Markdown shown so far.
   final ValueChanged<String>? onTextChanged;
 
+  /// The shape of the cursor shown while text arrives.
+  final StreamingCursorStyle cursorStyle;
+
+  /// Whether the bottom edge fades out while the reply streams, so new
+  /// lines appear to come out of it.
+  final bool fadeBottomEdge;
+
+  /// The shortest time between two updates. Raise it, e.g. to 50 ms, to
+  /// save work when a model sends many tiny chunks.
+  final Duration updateInterval;
+
   /// The scroll controller of the list that holds this widget.
   ///
   /// When given, the list keeps following the end of the text as it grows,
@@ -269,6 +289,10 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
   Duration? _thinkingTook;
   bool _sawStreaming = false;
   bool _completePending = false;
+  int _seenSkips = 0;
+  int _seenReplays = 0;
+  Duration _lastUpdate = Duration.zero;
+  Timer? _throttle;
   String? _reportedText;
 
   late final Ticker _ticker = createTicker(_onTick);
@@ -304,6 +328,8 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     }
     _controller.addListener(_onControllerChanged);
     _generation = _controller.generation;
+    _seenSkips = _controller.skipCount;
+    _seenReplays = _controller.replayCount;
     _showAll();
   }
 
@@ -436,12 +462,40 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     if (_controller.generation != _generation) {
       _generation = _controller.generation;
       _showAll();
+      setState(() {});
+      return;
+    }
+    if (_controller.replayCount != _seenReplays) {
+      _seenReplays = _controller.replayCount;
+      _ticker.stop();
+      _carry = 0;
+      _shown = 0;
+      _parser.reset();
+      _blockWidgets.clear();
+      _thinkingParser.reset();
+      _thinkingWidgets.clear();
+    }
+    if (_controller.skipCount != _seenSkips) {
+      _seenSkips = _controller.skipCount;
+      _ticker.stop();
+      _shown = text.length;
+    } else if (_controller.isPaused) {
+      _ticker.stop();
     } else if (!_smoothing.enabled) {
+      if (widget.updateInterval > Duration.zero) {
+        // coalesce bursts of small chunks into one update per interval
+        _throttle ??= Timer(widget.updateInterval, () {
+          _throttle = null;
+          if (mounted) setState(() => _shown = _controller.text.length);
+        });
+        return;
+      }
       _shown = text.length;
     } else if (_shown > text.length) {
       _shown = text.length;
     } else if (_shown < text.length && !_ticker.isActive) {
       _lastTick = Duration.zero;
+      _lastUpdate = Duration.zero;
       unawaited(_ticker.start());
     }
     setState(() {});
@@ -454,6 +508,8 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       _ticker.stop();
       return;
     }
+    if (elapsed - _lastUpdate < widget.updateInterval) return;
+    _lastUpdate = elapsed;
     final seconds =
         (elapsed - _lastTick).inMicroseconds / Duration.microsecondsPerSecond;
     _lastTick = elapsed;
@@ -461,12 +517,15 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     final step = _carry.isFinite ? _carry.floor() : waiting;
     if (step <= 0) return;
     _carry = _carry.isFinite ? _carry - step : 0;
-    setState(() {
-      _shown = graphemeBoundaryAtOrAfter(
-        text,
-        math.min(text.length, _shown + step),
-      );
-    });
+    var next = graphemeBoundaryAtOrAfter(
+      text,
+      math.min(text.length, _shown + step),
+    );
+    if (_smoothing.unit == RevealUnit.word) {
+      next = wordBoundaryAtOrAfter(text, next, _shown, _controller.isComplete);
+      if (next == _shown) return;
+    }
+    setState(() => _shown = next);
     if (_shown >= text.length) {
       _ticker.stop();
       _carry = 0;
@@ -475,6 +534,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
 
   @override
   void dispose() {
+    _throttle?.cancel();
     _ticker.dispose();
     _detach();
     super.dispose();
@@ -517,6 +577,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       ..mathBuilder = widget.mathBuilder
       ..showCursor = widget.showCursor
       ..fadeLength = _smoothing.fadeLength
+      ..cursorStyle = widget.cursorStyle
       ..linkSchemes = widget.allowedLinkSchemes
       ..imageSchemes = widget.allowedImageSchemes
       ..detectTextDirection = widget.detectTextDirection;
@@ -675,6 +736,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
             child: StreamingCursor(
               color: style.accentColor,
               fontSize: style.textStyle.fontSize ?? 14,
+              style: widget.cursorStyle,
             ),
           ),
         );
@@ -709,7 +771,29 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       );
     }
 
-    final column = _spaced(children, style.blockSpacing);
+    var column = _spaced(children, style.blockSpacing);
+    if (widget.fadeBottomEdge) {
+      column = ShaderMask(
+        blendMode: BlendMode.dstIn,
+        shaderCallback: (bounds) => LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            const Color(0xFFFFFFFF),
+            const Color(0xFFFFFFFF),
+            Color(streaming ? 0x00FFFFFF : 0xFFFFFFFF),
+          ],
+          stops: [
+            0,
+            bounds.height <= 0
+                ? 0
+                : math.max(0, 1 - 32 / bounds.height).toDouble(),
+            1,
+          ],
+        ).createShader(bounds),
+        child: column,
+      );
+    }
     if (!widget.tapToSkip) return column;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
