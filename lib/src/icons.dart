@@ -1,24 +1,8 @@
 import 'package:flutter/widgets.dart';
 
-/// The small icons this package draws itself, so it needs no icon font and
-/// no design library.
-enum MarkdownIconKind {
-  /// Two overlapping sheets, for the copy button.
-  copy,
+enum MarkdownIconKind { copy, check, box, checkedBox }
 
-  /// A check mark, shown after copying.
-  check,
-
-  /// An empty task-list box.
-  box,
-
-  /// A checked task-list box.
-  checkedBox,
-}
-
-/// Draws one [MarkdownIconKind] in a square of [size].
 class MarkdownIcon extends StatelessWidget {
-  /// Creates an icon.
   const MarkdownIcon(
     this.kind, {
     super.key,
@@ -27,16 +11,12 @@ class MarkdownIcon extends StatelessWidget {
     this.size = 16,
   });
 
-  /// Which icon to draw.
   final MarkdownIconKind kind;
 
-  /// The line color.
   final Color color;
 
-  /// The fill of a checked box; defaults to [color].
   final Color? accentColor;
 
-  /// The width and height.
   final double size;
 
   @override

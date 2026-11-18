@@ -1,31 +1,31 @@
 # llm_markdown
 
-Smooth, flicker-free Markdown for **streaming AI chat replies** in Flutter.
+Markdown widget for chat apps that stream replies from an LLM.
 
-Most apps re-parse and re-draw the whole reply every time a few new
-characters arrive. That gets slower as the reply grows, shows raw `**` and
-` ``` ` while syntax is unfinished, and makes code blocks flicker.
-`llm_markdown` does the work only for the new text:
+<img src="https://raw.githubusercontent.com/anant8140/llm_markdown/main/doc/demo.gif" width="320" alt="A reply streaming in: headings, a list, a code block, a table and a checklist">
 
-- **Parses only the new part.** Finished blocks are parsed and built once and
-  then kept. Only the last, open block is parsed again.
-- **Heals unfinished syntax.** An unclosed code block, `**bold`, `` `code ``
-  or `[link](https://exa` shows as it will look, not as raw symbols. A table
-  appears once its header row is complete.
-- **Smooth reveal.** Uneven bursts from the model are shown at a steady
-  pace, which speeds up automatically so the view never lags far behind.
-- **Code blocks** with the language name, a copy button and syntax
-  highlighting once the block is closed (so it never flickers).
-- **Follows the scroll** while the user is at the bottom, and stops when they
-  scroll up to read.
-- Tables, task lists, quotes, links and images, a streaming cursor, and
-  light and dark colors taken from your app.
-- **No design-library dependency.** It uses only `package:flutter/widgets.dart`,
-  so it works the same with `package:material_ui`, the Material library that
-  ships with Flutter, Cupertino, or no design library at all.
-- Works with any model or provider: it only needs the text.
+If you render a streaming reply with a regular Markdown widget, the whole
+text is parsed again on every chunk. That gets slow on long answers, you see
+raw `**` and backticks until the closing ones arrive, and code blocks flicker
+when they get highlighted.
 
-## Getting started
+This package fixes that:
+
+- Only the last unfinished block is parsed again. Finished blocks are built
+  once and cached.
+- Unfinished syntax is closed before rendering, so `**bold`, an open code
+  fence or a half-typed `[link](https://...` already looks right. Tables show
+  up once the header row is done.
+- Text is revealed at a steady speed instead of in bursts, and it speeds up
+  if it falls behind.
+- Code blocks have a copy button and get syntax highlighting once closed.
+- Optional auto-scroll that stops when the user scrolls up to read.
+- Depends only on `flutter/widgets.dart`, so it works with `material_ui`, the
+  old `flutter/material.dart`, Cupertino or no design library at all.
+
+It doesn't talk to any model API. You give it text, it renders it.
+
+## Install
 
 ```sh
 flutter pub add llm_markdown
@@ -33,97 +33,83 @@ flutter pub add llm_markdown
 
 ## Usage
 
-### From a stream of chunks
-
-```dart
-StreamingMarkdown.stream(
-  replyStream, // Stream<String>
-  onLinkTap: (url) => launchUrl(Uri.parse(url)),
-)
-```
-
-### With a controller
+With a controller:
 
 ```dart
 final controller = StreamingMarkdownController();
 
-// In build():
-StreamingMarkdown(controller: controller);
+// build()
+StreamingMarkdown(controller: controller)
 
-// As the reply arrives:
+// when the reply comes in
 await for (final chunk in model.generate(prompt)) {
   controller.append(chunk);
 }
 controller.complete();
 ```
 
-`controller.text` is the whole Markdown received so far, for example to copy
-the full reply.
+`controller.addStream(stream)` does the loop for you. `controller.text` has
+the full markdown, e.g. for a "copy reply" button.
 
-### From text you already keep in state
-
-```dart
-StreamingMarkdown.text(
-  message.text,
-  isComplete: message.isDone,
-)
-```
-
-When you rebuild with a longer text that starts with the previous one, only
-the new part is processed.
-
-### In a chat list
+Straight from a stream:
 
 ```dart
-ListView(
-  controller: scrollController,
-  children: [
-    for (final message in messages)
-      StreamingMarkdown(
-        controller: message.controller,
-        autoScrollController: scrollController,
-      ),
-  ],
-)
+StreamingMarkdown.stream(replyStream)
 ```
 
-With `ListView(reverse: true)` you do not need `autoScrollController`.
+A stream can only be listened to once, so inside a `ListView` (items get
+disposed when they scroll away) keep a controller per message instead.
 
-## Options
+Or from text you already keep in your state:
 
-| Option | Default | What it does |
-| --- | --- | --- |
-| `smoothing` | `Smoothing.adaptive()` | `Smoothing.none()` shows text at once. `charactersPerSecond` and `maxLag` tune the pace. |
-| `style` | from context | A `StreamingMarkdownStyle`; see [Styling](#styling). |
-| `onLinkTap` | none | Called with the address of a tapped link. |
-| `imageBuilder` | `Image.network` | Builds images. |
-| `codeBlockBuilder` | built-in | Builds code blocks, for example diagrams; return `null` for the default. |
-| `highlightCode` | `true` | Syntax highlighting for closed code blocks. |
-| `showCursor` | `true` | A blinking cursor while text arrives. |
-| `newlinesAsBreaks` | `false` | Show a single newline as a line break, as many chat apps do. |
-| `autoScrollController` | none | Keeps the list at the end while the user is at the bottom. |
+```dart
+StreamingMarkdown.text(message.text, isComplete: message.done)
+```
 
-## Selecting text
+If the new text starts with the old one, only the added part is processed.
 
-Wrap the chat in your design library's `SelectionArea`, so selection
-handles and the copy menu match your app. One area around the whole list
-also lets the user select across several messages:
+### Chat list
 
 ```dart
 SelectionArea(
-  child: ListView(children: [/* StreamingMarkdown widgets */]),
+  child: ListView(
+    controller: scrollController,
+    children: [
+      for (final message in messages)
+        StreamingMarkdown(
+          controller: message.controller,
+          autoScrollController: scrollController,
+        ),
+    ],
+  ),
 )
 ```
 
-## Styling
+`SelectionArea` comes from your design library and makes the text
+selectable. With `ListView(reverse: true)` you don't need
+`autoScrollController`.
 
-By default the text follows the surrounding `DefaultTextStyle`, and links,
-checked boxes and the cursor use the app's cursor color. Material and
-Cupertino apps set both from their theme. To choose the colors yourself:
+## Options
+
+| Option | Default | |
+| --- | --- | --- |
+| `smoothing` | `Smoothing.adaptive()` | `Smoothing.none()` shows text right away |
+| `style` | from context | see below |
+| `onLinkTap` | – | called with the link URL |
+| `imageBuilder` | `Image.network` | |
+| `codeBlockBuilder` | built-in | return `null` to fall back to the default |
+| `highlightCode` | `true` | |
+| `showCursor` | `true` | blinking cursor while streaming |
+| `newlinesAsBreaks` | `false` | treat a single newline as a line break |
+| `autoScrollController` | – | follow the reply while at the bottom |
+
+### Styling
+
+The default style takes the text style from `DefaultTextStyle` and the accent
+(links, checkboxes, cursor) from `DefaultSelectionStyle`. Material and
+Cupertino apps set both from their theme. To set it yourself:
 
 ```dart
-final theme = Theme.of(context);
-
 StreamingMarkdown(
   controller: controller,
   style: StreamingMarkdownStyle.fromColors(
@@ -133,35 +119,29 @@ StreamingMarkdown(
 )
 ```
 
-`healIncompleteMarkdown(text)` is also available on its own if you render
-Markdown with another package.
+`healIncompleteMarkdown()` is exported too, in case you want the healing
+with a different renderer.
 
 ## How it works
 
-1. The text is cut into blocks only where the part before the cut can no
-   longer change: a blank line before an independent block, the end of a
-   heading line or of a closed code fence.
-2. Those blocks are parsed once with the official
-   [`markdown`](https://pub.dev/packages/markdown) package (GitHub flavored)
-   and their widgets are cached.
-3. The open block is healed and parsed again on each frame that has new
-   text, and at most once per frame.
+The text is split into blocks only at points where nothing that comes later
+can change the block before it (a blank line before a new paragraph, the end
+of a heading, a closing code fence, ...). Those blocks are parsed once with
+[`markdown`](https://pub.dev/packages/markdown). The last block is healed and
+parsed again whenever new text arrives, at most once per frame.
 
-The test suite feeds each sample reply in every way it could arrive: one
-character at a time, line by line and in random chunks. It checks that no
-finished block ever differs from parsing the whole text at once.
-
-## Compatibility
-
-Developed and tested on Flutter 3.50 (the latest stable release). It
-also tested on Flutter 3.35, the oldest version it supports.
+The tests stream sample replies one character at a time, line by line and in
+random chunks, plus a few thousand generated documents, and check that every
+finished block matches a normal parse of the full text.
 
 ## Limitations
 
-- Footnotes are placed at the end of their block rather than at the end of
-  the reply.
+- Once a footnote definition appears, the reply is parsed as a whole again
+  (correct, just not incremental).
 - Raw HTML is shown as text.
-- Math (LaTeX) and collapsible "thinking" sections are planned.
+- No LaTeX yet.
+
+Tested on Flutter 3.35 and 3.50.
 
 ## License
 

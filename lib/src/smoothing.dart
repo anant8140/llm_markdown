@@ -52,8 +52,6 @@ class Smoothing {
   int get hashCode => Object.hash(enabled, charactersPerSecond, maxLag);
 }
 
-/// Returns the first grapheme boundary in [text] at or after [index], so a
-/// letter with its marks, such as "સ્તે", or an emoji is never cut apart.
 int graphemeBoundaryAtOrAfter(String text, int index) {
   if (index <= 0) return 0;
   if (index >= text.length) return text.length;

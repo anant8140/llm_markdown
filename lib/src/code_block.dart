@@ -13,7 +13,6 @@ Highlight? _highlighter;
 Highlight get _sharedHighlighter =>
     _highlighter ??= Highlight()..registerLanguages(builtinAllLanguages);
 
-/// Returns [code] as highlighted spans, or null when [language] is unknown.
 TextSpan? highlightCode(
   String code,
   String? language,
@@ -30,15 +29,12 @@ TextSpan? highlightCode(
     result.render(renderer);
     return renderer.span;
   } on Object {
-    // The highlighter is a port of highlight.js; a grammar bug must not
-    // break the reply, so plain text is shown instead.
+    // some grammars throw on odd input, fall back to plain text
     return null;
   }
 }
 
-/// A fenced code block with its language and a copy button.
 class CodeBlockView extends StatefulWidget {
-  /// Creates a code block view.
   const CodeBlockView({
     super.key,
     required this.code,
@@ -48,19 +44,14 @@ class CodeBlockView extends StatefulWidget {
     this.trailing,
   });
 
-  /// The code, without the fences.
   final String code;
 
-  /// The language from the info string, such as `dart`.
   final String? language;
 
-  /// The style to draw with.
   final StreamingMarkdownStyle style;
 
-  /// Whether to highlight the code; false while the block still grows.
   final bool highlight;
 
-  /// A span shown after the code, used for the streaming cursor.
   final InlineSpan? trailing;
 
   @override
