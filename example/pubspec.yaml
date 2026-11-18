@@ -1,0 +1,21 @@
+name: llm_markdown_example
+description: A chat demo that streams a reply into llm_markdown.
+publish_to: none
+version: 1.0.0
+
+environment:
+  sdk: ^3.14.0
+  flutter: ">=3.50.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  llm_markdown:
+    path: ../
+  material_ui: ^1.11.1
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
