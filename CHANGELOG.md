@@ -47,6 +47,15 @@
   very long replies in a `CustomScrollView`.
 * `JumpToLatest` shows a "new messages" button while the user has scrolled
   away from the end.
+* Your own syntaxes: `MarkdownSyntax(blockSyntaxes: ..., inlineSyntaxes:
+  ...)` from `package:markdown`, and `elementBuilders` to draw any element
+  your way, built-in ones included.
+* `StreamingMarkdownTheme` gives every widget below it a style;
+  `StreamingMarkdownStyle.lerp` for animated theme changes or a Material
+  `ThemeExtension`.
+* Style presets: `StreamingMarkdownStyle.compact`, `.spacious` and
+  `.terminal`.
+* `StreamingMarkdownStyle.blockPadding` pads blocks by tag.
 
 ## 0.2.0
 

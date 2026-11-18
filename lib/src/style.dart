@@ -1,3 +1,5 @@
+import 'dart:ui' show lerpDouble;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:re_highlight/styles/atom-one-dark.dart';
@@ -65,6 +67,7 @@ class StreamingMarkdownStyle {
     this.alertColors = _lightAlerts,
     this.blockSpacing = 12,
     this.listIndent = 24,
+    this.blockPadding = const {},
   }) : assert(headingStyles.length == 6, 'headingStyles needs 6 styles');
 
   /// A style built from a body [textStyle] and an [accentColor] for links,
@@ -147,9 +150,78 @@ class StreamingMarkdownStyle {
     );
   }
 
-  /// The style for [context]: its [DefaultTextStyle] for text and its
-  /// [DefaultSelectionStyle] cursor color as the accent.
+  /// Tighter spacing, for small bubbles and side panels.
+  factory StreamingMarkdownStyle.compact({
+    required TextStyle textStyle,
+    required Color accentColor,
+    Brightness? brightness,
+    TextStyle? monospace,
+  }) => StreamingMarkdownStyle.fromColors(
+    textStyle: textStyle,
+    accentColor: accentColor,
+    brightness: brightness,
+    monospace: monospace,
+  )._spaced(lineHeight: 1.35, blockSpacing: 8, listIndent: 20);
+
+  /// Roomier spacing, for long answers read like a document.
+  factory StreamingMarkdownStyle.spacious({
+    required TextStyle textStyle,
+    required Color accentColor,
+    Brightness? brightness,
+    TextStyle? monospace,
+  }) => StreamingMarkdownStyle.fromColors(
+    textStyle: textStyle,
+    accentColor: accentColor,
+    brightness: brightness,
+    monospace: monospace,
+  )._spaced(lineHeight: 1.7, blockSpacing: 18, listIndent: 28);
+
+  /// Everything in a monospace font with square boxes, like a terminal.
+  factory StreamingMarkdownStyle.terminal({
+    required TextStyle textStyle,
+    required Color accentColor,
+    Brightness? brightness,
+    TextStyle? monospace,
+  }) {
+    final mono =
+        monospace ??
+        const TextStyle(
+          fontFamily: 'monospace',
+          fontFamilyFallback: _monospaceFallback,
+        );
+    final base = StreamingMarkdownStyle.fromColors(
+      textStyle: textStyle.merge(mono),
+      accentColor: accentColor,
+      brightness: brightness,
+      monospace: mono,
+    );
+    return base.copyWith(
+      headingStyles: [
+        for (final heading in base.headingStyles)
+          heading.copyWith(fontSize: base.textStyle.fontSize),
+      ],
+      codeBlockDecoration: base.codeBlockDecoration.copyWith(
+        borderRadius: BorderRadius.zero,
+      ),
+    );
+  }
+
+  StreamingMarkdownStyle _spaced({
+    required double lineHeight,
+    required double blockSpacing,
+    required double listIndent,
+  }) => copyWith(
+    textStyle: textStyle.copyWith(height: lineHeight),
+    blockSpacing: blockSpacing,
+    listIndent: listIndent,
+  );
+
+  /// The style for [context]: the nearest [StreamingMarkdownTheme], or else
+  /// its [DefaultTextStyle] for text and its [DefaultSelectionStyle] cursor
+  /// color as the accent.
   factory StreamingMarkdownStyle.of(BuildContext context) {
+    final themed = StreamingMarkdownTheme.maybeOf(context);
+    if (themed != null) return themed;
     final textStyle = DefaultTextStyle.of(context).style;
     final dark = (textStyle.color?.computeLuminance() ?? 0) > 0.5;
     final accent =
@@ -209,6 +281,56 @@ class StreamingMarkdownStyle {
   /// The width reserved for list bullets and numbers.
   final double listIndent;
 
+  /// Extra padding around blocks, by tag: `p`, `h1` to `h6`, `pre` (code),
+  /// `blockquote`, `ul`, `ol`, `table`, `hr`, `math-block`, `details`, or
+  /// the tag of a custom syntax. For example `{'h2': EdgeInsets.only(top: 8)}`.
+  final Map<String, EdgeInsetsGeometry> blockPadding;
+
+  /// Blends two styles, for animated theme changes, e.g. from a Material
+  /// `ThemeExtension.lerp`. Highlighting colors, alert colors and padding
+  /// switch halfway.
+  static StreamingMarkdownStyle lerp(
+    StreamingMarkdownStyle a,
+    StreamingMarkdownStyle b,
+    double t,
+  ) {
+    if (identical(a, b)) return a;
+    final first = t < 0.5;
+    TextStyle text(TextStyle x, TextStyle y) => TextStyle.lerp(x, y, t)!;
+    return StreamingMarkdownStyle(
+      textStyle: text(a.textStyle, b.textStyle),
+      headingStyles: [
+        for (var i = 0; i < 6; i++)
+          text(a.headingStyles[i], b.headingStyles[i]),
+      ],
+      inlineCodeStyle: text(a.inlineCodeStyle, b.inlineCodeStyle),
+      codeBlockTextStyle: text(a.codeBlockTextStyle, b.codeBlockTextStyle),
+      codeBlockDecoration: BoxDecoration.lerp(
+        a.codeBlockDecoration,
+        b.codeBlockDecoration,
+        t,
+      )!,
+      codeBlockHeaderStyle: text(
+        a.codeBlockHeaderStyle,
+        b.codeBlockHeaderStyle,
+      ),
+      codeTheme: first ? a.codeTheme : b.codeTheme,
+      blockquoteDecoration: BoxDecoration.lerp(
+        a.blockquoteDecoration,
+        b.blockquoteDecoration,
+        t,
+      )!,
+      linkStyle: text(a.linkStyle, b.linkStyle),
+      dividerColor: Color.lerp(a.dividerColor, b.dividerColor, t)!,
+      tableHeaderColor: Color.lerp(a.tableHeaderColor, b.tableHeaderColor, t)!,
+      accentColor: Color.lerp(a.accentColor, b.accentColor, t)!,
+      alertColors: first ? a.alertColors : b.alertColors,
+      blockSpacing: lerpDouble(a.blockSpacing, b.blockSpacing, t)!,
+      listIndent: lerpDouble(a.listIndent, b.listIndent, t)!,
+      blockPadding: first ? a.blockPadding : b.blockPadding,
+    );
+  }
+
   /// Returns a copy with the given parts replaced.
   StreamingMarkdownStyle copyWith({
     TextStyle? textStyle,
@@ -226,6 +348,7 @@ class StreamingMarkdownStyle {
     Map<String, Color>? alertColors,
     double? blockSpacing,
     double? listIndent,
+    Map<String, EdgeInsetsGeometry>? blockPadding,
   }) => StreamingMarkdownStyle(
     textStyle: textStyle ?? this.textStyle,
     headingStyles: headingStyles ?? this.headingStyles,
@@ -242,6 +365,7 @@ class StreamingMarkdownStyle {
     alertColors: alertColors ?? this.alertColors,
     blockSpacing: blockSpacing ?? this.blockSpacing,
     listIndent: listIndent ?? this.listIndent,
+    blockPadding: blockPadding ?? this.blockPadding,
   );
 
   @override
@@ -261,7 +385,8 @@ class StreamingMarkdownStyle {
       other.accentColor == accentColor &&
       mapEquals(other.alertColors, alertColors) &&
       other.blockSpacing == blockSpacing &&
-      other.listIndent == listIndent;
+      other.listIndent == listIndent &&
+      mapEquals(other.blockPadding, blockPadding);
 
   @override
   int get hashCode => Object.hash(
@@ -280,5 +405,34 @@ class StreamingMarkdownStyle {
     Object.hashAllUnordered(alertColors.entries.map((e) => (e.key, e.value))),
     blockSpacing,
     listIndent,
+    Object.hashAllUnordered(blockPadding.entries.map((e) => (e.key, e.value))),
   );
+}
+
+/// Gives every `StreamingMarkdown` below it the same [style], unless the
+/// widget has its own.
+///
+/// In a Material app the style can also live in a `ThemeExtension`; its
+/// `lerp` can call [StreamingMarkdownStyle.lerp], and a
+/// `StreamingMarkdownTheme` built from it near the top of the app passes it
+/// on.
+class StreamingMarkdownTheme extends InheritedWidget {
+  /// Creates a theme for the widgets in [child].
+  const StreamingMarkdownTheme({
+    super.key,
+    required this.style,
+    required super.child,
+  });
+
+  /// The style of the `StreamingMarkdown` widgets below.
+  final StreamingMarkdownStyle style;
+
+  /// The style of the nearest theme, or null.
+  static StreamingMarkdownStyle? maybeOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<StreamingMarkdownTheme>()
+      ?.style;
+
+  @override
+  bool updateShouldNotify(StreamingMarkdownTheme oldWidget) =>
+      style != oldWidget.style;
 }

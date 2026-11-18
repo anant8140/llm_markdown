@@ -20,6 +20,14 @@ import 'style.dart';
 typedef MarkdownImageBuilder =
     Widget Function(BuildContext context, Uri uri, String? alt);
 
+/// Builds the widget for a Markdown element, such as one made by a custom
+/// syntax, or returns null for the default look.
+///
+/// [isComplete] is false while the element is still streaming. Elements
+/// inside a paragraph become inline widgets.
+typedef MarkdownElementBuilder =
+    Widget? Function(BuildContext context, md.Element element, bool isComplete);
+
 /// Called when an image is tapped, with its address and alternative text.
 typedef MarkdownImageTapCallback = void Function(Uri uri, String? alt);
 
@@ -95,6 +103,8 @@ class RenderSettings {
   bool zoomImages = true;
 
   String? searchQuery;
+
+  Map<String, MarkdownElementBuilder> elementBuilders = const {};
 
   Color? searchColor;
 
@@ -393,7 +403,13 @@ class _Builder {
 
     for (var i = 0; i < nodes.length; i++) {
       final node = nodes[i];
-      if (_isInline(node)) {
+      // a custom element between blocks is a block, except in a tight list
+      // item, whose text sits right in the item
+      final customBlock =
+          node is md.Element &&
+          parent?.tag != 'li' &&
+          settings.elementBuilders.containsKey(node.tag);
+      if (_isInline(node) && !customBlock) {
         pending.add(node);
         continue;
       }
@@ -417,6 +433,16 @@ class _Builder {
   }
 
   Widget? _block(md.Element element) {
+    Widget? built;
+    final builder = settings.elementBuilders[element.tag];
+    if (builder != null) built = builder(context, element, isComplete);
+    built ??= _defaultBlock(element);
+    final padding = style.blockPadding[element.tag];
+    if (built == null || padding == null) return built;
+    return Padding(padding: padding, child: built);
+  }
+
+  Widget? _defaultBlock(md.Element element) {
     switch (element.tag) {
       case blockMathTag:
         return _mathBlock(
@@ -659,6 +685,11 @@ class _Builder {
     }
     if (node is! md.Element) {
       return [TextSpan(text: node.textContent, recognizer: link)];
+    }
+    final builder = settings.elementBuilders[node.tag];
+    final built = builder?.call(context, node, isComplete);
+    if (built != null) {
+      return [WidgetSpan(alignment: PlaceholderAlignment.middle, child: built)];
     }
     final children = node.children ?? const <md.Node>[];
     List<InlineSpan> styled(TextStyle extra) => [

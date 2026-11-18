@@ -81,6 +81,7 @@ class StreamingMarkdown extends StatefulWidget {
     this.maxLines,
     this.fadeOverflow = true,
     this.sliver = false,
+    this.elementBuilders = const {},
     this.autoScrollController,
   }) : assert(maxLines == null || maxLines > 0, 'maxLines must be positive'),
        assert(!sliver || maxLines == null, 'a sliver has no maxLines'),
@@ -132,6 +133,7 @@ class StreamingMarkdown extends StatefulWidget {
     this.maxLines,
     this.fadeOverflow = true,
     this.sliver = false,
+    this.elementBuilders = const {},
     this.autoScrollController,
   }) : assert(maxLines == null || maxLines > 0, 'maxLines must be positive'),
        assert(!sliver || maxLines == null, 'a sliver has no maxLines'),
@@ -183,6 +185,7 @@ class StreamingMarkdown extends StatefulWidget {
     this.maxLines,
     this.fadeOverflow = true,
     this.sliver = false,
+    this.elementBuilders = const {},
     this.autoScrollController,
   }) : assert(maxLines == null || maxLines > 0, 'maxLines must be positive'),
        assert(!sliver || maxLines == null, 'a sliver has no maxLines'),
@@ -354,6 +357,11 @@ class StreamingMarkdown extends StatefulWidget {
   /// view, which keeps very long replies fast. [fadeBottomEdge] and
   /// [maxLines] don't apply to a sliver.
   final bool sliver;
+
+  /// Your own widgets for Markdown elements, by tag, for example for the
+  /// tags of `MarkdownSyntax.blockSyntaxes`, or `'blockquote'`. A builder
+  /// that returns null keeps the default look.
+  final Map<String, MarkdownElementBuilder> elementBuilders;
 
   /// The scroll controller of the list that holds this widget.
   ///
@@ -681,6 +689,10 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
         widget.codeBlocks.collapseAfterLines !=
             _settings.codeBlocks.collapseAfterLines ||
         widget.searchQuery != _settings.searchQuery ||
+        !setEquals(
+          widget.elementBuilders.keys.toSet(),
+          _settings.elementBuilders.keys.toSet(),
+        ) ||
         widget.searchHighlightColor != _settings.searchColor ||
         widget.zoomImages != _settings.zoomImages ||
         (widget.onImageTap == null) != (_settings.onImageTap == null) ||
@@ -700,6 +712,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       ..onCitationTap = widget.onCitationTap
       ..codeBlocks = widget.codeBlocks
       ..searchQuery = widget.searchQuery
+      ..elementBuilders = widget.elementBuilders
       ..searchColor = widget.searchHighlightColor
       ..zoomImages = widget.zoomImages
       ..onImageTap = widget.onImageTap

@@ -23,12 +23,13 @@ export 'src/safety.dart' show defaultImageSchemes, defaultLinkSchemes;
 export 'src/renderer.dart'
     show
         MarkdownCodeBlockBuilder,
+        MarkdownElementBuilder,
         MarkdownImageBuilder,
         MarkdownImageTapCallback,
         MarkdownMathBuilder,
         StreamingCursorStyle;
 export 'src/smoothing.dart' show RevealUnit, Smoothing;
 export 'src/streaming_markdown.dart' show StreamingMarkdown;
-export 'src/style.dart' show StreamingMarkdownStyle;
+export 'src/style.dart' show StreamingMarkdownStyle, StreamingMarkdownTheme;
 export 'src/syntaxes.dart' show MarkdownSyntax;
 export 'src/thinking.dart' show ThinkingLabelBuilder;

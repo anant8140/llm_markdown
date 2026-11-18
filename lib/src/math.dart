@@ -87,11 +87,13 @@ md.Document newMarkdownDocument([
         if (syntax.autolinks || s is! md.AutolinkExtensionSyntax) s,
     ]),
     blockSyntaxes: [
+      ...syntax.blockSyntaxes,
       MathBlockSyntax(dollar: syntax.dollarMath),
       if (syntax.details) DetailsBlockSyntax(),
       if (syntax.alerts) const AlertSyntax(),
     ],
     inlineSyntaxes: [
+      ...syntax.inlineSyntaxes,
       InlineMathSyntax(dollar: syntax.dollarMath),
       if (syntax.inlineHtml) SafeHtmlSyntax(),
       if (syntax.highlightAndSpoilers) ...[HighlightSyntax(), SpoilerSyntax()],

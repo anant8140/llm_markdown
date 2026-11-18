@@ -20,6 +20,8 @@ class MarkdownSyntax {
     this.details = true,
     this.autolinks = true,
     this.autolinkSchemes = const {},
+    this.blockSyntaxes = const [],
+    this.inlineSyntaxes = const [],
   });
 
   /// Whether `$...$` and `$$...$$` are math. `\(...\)` and `\[...\]` always
@@ -54,6 +56,19 @@ class MarkdownSyntax {
   /// `StreamingMarkdown.allowedLinkSchemes` to open.
   final Set<String> autolinkSchemes;
 
+  /// Your own block syntaxes from `package:markdown`, tried before the
+  /// built-in ones. Show what they make with
+  /// `StreamingMarkdown.elementBuilders`.
+  ///
+  /// While a reply streams, a block is finished at the first blank line
+  /// outside code, math and `<details>`, so a custom block must not contain
+  /// blank lines.
+  final List<md.BlockSyntax> blockSyntaxes;
+
+  /// Your own inline syntaxes from `package:markdown`, tried before the
+  /// built-in ones, e.g. for `@mentions`.
+  final List<md.InlineSyntax> inlineSyntaxes;
+
   @override
   bool operator ==(Object other) =>
       other is MarkdownSyntax &&
@@ -65,7 +80,9 @@ class MarkdownSyntax {
       other.inlineHtml == inlineHtml &&
       other.details == details &&
       other.autolinks == autolinks &&
-      setEquals(other.autolinkSchemes, autolinkSchemes);
+      setEquals(other.autolinkSchemes, autolinkSchemes) &&
+      _sameSyntaxes(other.blockSyntaxes, blockSyntaxes) &&
+      _sameSyntaxes(other.inlineSyntaxes, inlineSyntaxes);
 
   @override
   int get hashCode => Object.hash(
@@ -78,7 +95,28 @@ class MarkdownSyntax {
     details,
     autolinks,
     Object.hashAllUnordered(autolinkSchemes),
+    Object.hashAll(blockSyntaxes.map(_syntaxKey)),
+    Object.hashAll(inlineSyntaxes.map(_syntaxKey)),
   );
+}
+
+// Syntaxes made again on every build are still the same syntax, so the
+// parser isn't thrown away each time.
+(Type, String) _syntaxKey(Object syntax) => (
+  syntax.runtimeType,
+  switch (syntax) {
+    final md.BlockSyntax block => block.pattern.pattern,
+    final md.InlineSyntax inline => inline.pattern.pattern,
+    _ => '',
+  },
+);
+
+bool _sameSyntaxes(List<Object> a, List<Object> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (_syntaxKey(a[i]) != _syntaxKey(b[i])) return false;
+  }
+  return true;
 }
 
 class HighlightSyntax extends md.InlineSyntax {
