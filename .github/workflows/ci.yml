@@ -40,6 +40,7 @@ jobs:
       - run: |
           sed -i '/material_ui/d' pubspec.yaml
           rm test/design_library_test.dart
-      - run: flutter pub get
+      # the example targets the latest Flutter only
+      - run: flutter pub get --no-example
       - run: flutter analyze lib test
       - run: flutter test
