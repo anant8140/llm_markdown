@@ -183,3 +183,129 @@ class _CopyReplyButtonState extends State<CopyReplyButton> {
     );
   }
 }
+
+/// Builds the jump button of [JumpToLatest]; call [jump] to scroll to the
+/// end.
+typedef JumpToLatestBuilder =
+    Widget Function(BuildContext context, VoidCallback jump);
+
+/// Shows a button while the user has scrolled away from the end of a chat,
+/// for example a "↓ New messages" chip in a `Stack` over the list.
+///
+/// Give it the same [controller] as `StreamingMarkdown.autoScrollController`.
+/// Once the list is back at the end, following new text resumes.
+class JumpToLatest extends StatefulWidget {
+  /// Creates a jump-to-latest button.
+  const JumpToLatest({
+    super.key,
+    required this.controller,
+    required this.builder,
+    this.content,
+    this.threshold = 48,
+    this.duration = const Duration(milliseconds: 300),
+    this.curve = Curves.easeOut,
+  });
+
+  /// The scroll controller of the chat list.
+  final ScrollController controller;
+
+  /// Builds the button.
+  final JumpToLatestBuilder builder;
+
+  /// Something that changes when text arrives, such as the
+  /// `StreamingMarkdownController`, so the button also shows when new text
+  /// grows the list below the screen.
+  final Listenable? content;
+
+  /// How far from the end, in pixels, still counts as at the end.
+  final double threshold;
+
+  /// How long the jump takes; zero jumps at once.
+  final Duration duration;
+
+  /// The curve of the jump.
+  final Curve curve;
+
+  @override
+  State<JumpToLatest> createState() => _JumpToLatestState();
+}
+
+class _JumpToLatestState extends State<JumpToLatest> {
+  bool _away = false;
+  bool _scheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _listen(widget);
+    _schedule();
+  }
+
+  @override
+  void didUpdateWidget(JumpToLatest oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller ||
+        oldWidget.content != widget.content) {
+      _unlisten(oldWidget);
+      _listen(widget);
+      _schedule();
+    }
+  }
+
+  @override
+  void dispose() {
+    _unlisten(widget);
+    super.dispose();
+  }
+
+  void _listen(JumpToLatest widget) {
+    widget.controller.addListener(_schedule);
+    widget.content?.addListener(_schedule);
+  }
+
+  void _unlisten(JumpToLatest widget) {
+    widget.controller.removeListener(_schedule);
+    widget.content?.removeListener(_schedule);
+  }
+
+  // after layout, when the scroll extent is known
+  void _schedule() {
+    if (_scheduled) return;
+    _scheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduled = false;
+      if (!mounted) return;
+      final controller = widget.controller;
+      var away = false;
+      if (controller.positions.length == 1) {
+        final position = controller.position;
+        away =
+            position.hasContentDimensions &&
+            position.maxScrollExtent - position.pixels > widget.threshold;
+      }
+      if (away != _away) setState(() => _away = away);
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  void _jump() {
+    final controller = widget.controller;
+    if (controller.positions.length != 1) return;
+    final end = controller.position.maxScrollExtent;
+    if (widget.duration == Duration.zero) {
+      controller.jumpTo(end);
+    } else {
+      unawaited(
+        controller.animateTo(
+          end,
+          duration: widget.duration,
+          curve: widget.curve,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      _away ? widget.builder(context, _jump) : const SizedBox.shrink();
+}

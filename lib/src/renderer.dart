@@ -8,6 +8,7 @@ import 'code_block.dart';
 import 'code_options.dart';
 import 'direction.dart';
 import 'fade.dart';
+import 'headings.dart';
 import 'icons.dart';
 import 'math.dart';
 import 'safety.dart';
@@ -18,6 +19,9 @@ import 'style.dart';
 /// Builds a widget for an image, given its address and alternative text.
 typedef MarkdownImageBuilder =
     Widget Function(BuildContext context, Uri uri, String? alt);
+
+/// Called when an image is tapped, with its address and alternative text.
+typedef MarkdownImageTapCallback = void Function(Uri uri, String? alt);
 
 /// Builds a widget for a fenced code block, or returns null to use the
 /// default code block.
@@ -85,6 +89,14 @@ class RenderSettings {
   ValueChanged<int>? onCitationTap;
 
   CodeBlockOptions codeBlocks = const CodeBlockOptions();
+
+  MarkdownImageTapCallback? onImageTap;
+
+  bool zoomImages = true;
+
+  String? searchQuery;
+
+  Color? searchColor;
 
   // footnotes and headings, so "#fn-1" links can scroll to them
   final Map<String, GlobalKey> anchors = {};
@@ -428,7 +440,7 @@ class _Builder {
         );
       case 'h1' || 'h2' || 'h3' || 'h4' || 'h5' || 'h6':
         final level = int.parse(element.tag.substring(1));
-        return Semantics(
+        final heading = Semantics(
           header: true,
           child: _paragraph(
             element.children ?? const [],
@@ -436,6 +448,16 @@ class _Builder {
             cursor: identical(element, cursorTarget),
           ),
         );
+        final id = element.attributes['id'];
+        return id == null
+            ? heading
+            : KeyedSubtree(
+                key: settings.anchors.putIfAbsent(
+                  headingAnchor(id),
+                  GlobalKey.new,
+                ),
+                child: heading,
+              );
       case 'blockquote':
         return _directed(
           element.textContent,
@@ -629,6 +651,10 @@ class _Builder {
     if (node is md.Text) {
       var text = node.text;
       if (!settings.newlinesAsBreaks) text = text.replaceAll('\n', ' ');
+      final query = settings.searchQuery;
+      if (query != null && query.isNotEmpty) {
+        return _searched(text, query, link);
+      }
       return [TextSpan(text: text, recognizer: link)];
     }
     if (node is! md.Element) {
@@ -784,11 +810,44 @@ class _Builder {
     }
   }
 
+  // marks every match of the search query
+  List<InlineSpan> _searched(
+    String text,
+    String query,
+    GestureRecognizer? link,
+  ) {
+    final spans = <InlineSpan>[];
+    final found = TextStyle(
+      backgroundColor:
+          settings.searchColor ?? style.accentColor.withValues(alpha: 0.3),
+    );
+    var at = 0;
+    for (final match in RegExp(
+      RegExp.escape(query),
+      caseSensitive: false,
+    ).allMatches(text)) {
+      if (match.start == match.end) continue;
+      if (match.start > at) {
+        spans.add(
+          TextSpan(text: text.substring(at, match.start), recognizer: link),
+        );
+      }
+      spans.add(TextSpan(text: match[0], style: found, recognizer: link));
+      at = match.end;
+    }
+    if (at < text.length || spans.isEmpty) {
+      spans.add(TextSpan(text: text.substring(at), recognizer: link));
+    }
+    return spans;
+  }
+
   // "#fn-1" scrolls to the footnote; anything else goes to onLinkTap
   void _openLink(String href) {
-    final anchor = href.startsWith('#')
-        ? settings.anchors[href.substring(1)]?.currentContext
-        : null;
+    final id = href.startsWith('#') ? href.substring(1) : null;
+    final anchor = id == null
+        ? null
+        : (settings.anchors[id] ?? settings.anchors[headingAnchor(id)])
+              ?.currentContext;
     if (anchor != null && anchor.mounted) {
       unawaited(
         Scrollable.ensureVisible(
@@ -807,13 +866,45 @@ class _Builder {
     if (uri == null || !isAllowedUrl(source, settings.imageSchemes)) {
       return Text(alt ?? '', style: style.textStyle);
     }
-    final builder = settings.imageBuilder;
-    if (builder != null) return builder(context, uri, alt);
-    return Image.network(
-      uri.toString(),
-      semanticLabel: alt,
-      errorBuilder: (context, error, stackTrace) =>
-          Text(alt ?? '', style: style.textStyle),
+    Widget build(BuildContext context) {
+      final builder = settings.imageBuilder;
+      if (builder != null) return builder(context, uri, alt);
+      return Image.network(
+        uri.toString(),
+        semanticLabel: alt,
+        errorBuilder: (context, error, stackTrace) =>
+            Text(alt ?? '', style: style.textStyle),
+      );
+    }
+
+    final navigator = Navigator.maybeOf(context);
+    final zoom = settings.zoomImages && navigator != null;
+    if (settings.onImageTap == null && !zoom) return build(context);
+    // read when tapped: the callback may be a new closure on every build
+    void tap() {
+      final onTap = settings.onImageTap;
+      if (onTap != null) {
+        onTap(uri, alt);
+        return;
+      }
+      if (navigator == null) return;
+      unawaited(
+        navigator.push(
+          PageRouteBuilder<void>(
+            opaque: false,
+            barrierDismissible: true,
+            barrierColor: const Color(0xE6000000),
+            barrierLabel: 'Close image',
+            pageBuilder: (context, _, _) => ImageViewer(child: build(context)),
+          ),
+        ),
+      );
+    }
+
+    return Semantics(
+      button: true,
+      onTapHint: 'zoom',
+      child: GestureDetector(onTap: tap, child: build(context)),
     );
   }
 
@@ -1026,6 +1117,26 @@ class _SpoilerState extends State<_Spoiler> {
             color: _shown ? null : const Color(0x00000000),
           ),
         ),
+      ),
+    ),
+  );
+}
+
+/// A full screen image that can be pinched and dragged; a tap closes it.
+class ImageViewer extends StatelessWidget {
+  const ImageViewer({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: 'Close image',
+    button: true,
+    child: GestureDetector(
+      onTap: () => Navigator.of(context).maybePop(),
+      child: InteractiveViewer(
+        maxScale: 5,
+        child: SizedBox.expand(child: Center(child: child)),
       ),
     ),
   );

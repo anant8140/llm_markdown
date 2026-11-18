@@ -36,6 +36,17 @@
 * `CodeThemes` with 13 ready-made highlighting themes, and
   `StreamingMarkdownStyle.fromColors(monospace: ...)` for your own code
   font.
+* Headings get GitHub style ids, so `[Setup](#setup)` links scroll to
+  them; `headings: MarkdownHeadings()` collects them for a table of
+  contents and scrolls to one with `scrollTo(id)`.
+* `searchQuery` marks matches for find-in-chat.
+* Tapping an image opens it full screen with pinch-to-zoom (`zoomImages`),
+  or calls `onImageTap`.
+* `maxLines` with `fadeOverflow` for previews.
+* `sliver: true` makes the widget a sliver that builds blocks lazily, for
+  very long replies in a `CustomScrollView`.
+* `JumpToLatest` shows a "new messages" button while the user has scrolled
+  away from the end.
 
 ## 0.2.0
 

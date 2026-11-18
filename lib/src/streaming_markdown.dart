@@ -9,6 +9,8 @@ import 'package:flutter/services.dart';
 import 'code_options.dart';
 import 'controller.dart';
 import 'direction.dart';
+import 'headings.dart';
+import 'line_clip.dart';
 import 'incremental_parser.dart';
 import 'renderer.dart';
 import 'safety.dart';
@@ -71,8 +73,18 @@ class StreamingMarkdown extends StatefulWidget {
     this.syntax = const MarkdownSyntax(),
     this.onCitationTap,
     this.codeBlocks = const CodeBlockOptions(),
+    this.headings,
+    this.searchQuery,
+    this.searchHighlightColor,
+    this.onImageTap,
+    this.zoomImages = true,
+    this.maxLines,
+    this.fadeOverflow = true,
+    this.sliver = false,
     this.autoScrollController,
-  }) : stream = null,
+  }) : assert(maxLines == null || maxLines > 0, 'maxLines must be positive'),
+       assert(!sliver || maxLines == null, 'a sliver has no maxLines'),
+       stream = null,
        text = null,
        isComplete = false;
 
@@ -112,8 +124,18 @@ class StreamingMarkdown extends StatefulWidget {
     this.syntax = const MarkdownSyntax(),
     this.onCitationTap,
     this.codeBlocks = const CodeBlockOptions(),
+    this.headings,
+    this.searchQuery,
+    this.searchHighlightColor,
+    this.onImageTap,
+    this.zoomImages = true,
+    this.maxLines,
+    this.fadeOverflow = true,
+    this.sliver = false,
     this.autoScrollController,
-  }) : controller = null,
+  }) : assert(maxLines == null || maxLines > 0, 'maxLines must be positive'),
+       assert(!sliver || maxLines == null, 'a sliver has no maxLines'),
+       controller = null,
        text = null,
        isComplete = false;
 
@@ -153,8 +175,18 @@ class StreamingMarkdown extends StatefulWidget {
     this.syntax = const MarkdownSyntax(),
     this.onCitationTap,
     this.codeBlocks = const CodeBlockOptions(),
+    this.headings,
+    this.searchQuery,
+    this.searchHighlightColor,
+    this.onImageTap,
+    this.zoomImages = true,
+    this.maxLines,
+    this.fadeOverflow = true,
+    this.sliver = false,
     this.autoScrollController,
-  }) : controller = null,
+  }) : assert(maxLines == null || maxLines > 0, 'maxLines must be positive'),
+       assert(!sliver || maxLines == null, 'a sliver has no maxLines'),
+       controller = null,
        stream = null;
 
   /// The controller whose text is shown, when created with the default
@@ -289,6 +321,40 @@ class StreamingMarkdown extends StatefulWidget {
   /// streaming, and custom header buttons for code blocks.
   final CodeBlockOptions codeBlocks;
 
+  /// Collects the reply's headings for a table of contents, and scrolls to
+  /// them. Headings also get ids, so `[Setup](#setup)` links scroll there.
+  final MarkdownHeadings? headings;
+
+  /// Marks every case-insensitive match of this text, for find-in-chat.
+  /// Code blocks are not searched.
+  final String? searchQuery;
+
+  /// The background of [searchQuery] matches; defaults to the accent color,
+  /// faded.
+  final Color? searchHighlightColor;
+
+  /// Called when an image is tapped. Without it, a tap opens the image full
+  /// screen, where it can be zoomed, as long as [zoomImages] is true and
+  /// there is a `Navigator`.
+  final MarkdownImageTapCallback? onImageTap;
+
+  /// Whether tapping an image opens it full screen with pinch-to-zoom.
+  final bool zoomImages;
+
+  /// Shows only about this many lines of body text, for previews such as a
+  /// chat list. What doesn't fit is cut off, faded when [fadeOverflow] is
+  /// true. Headings, code and images count by their height.
+  final int? maxLines;
+
+  /// Whether text cut off by [maxLines] fades out instead of ending sharply.
+  final bool fadeOverflow;
+
+  /// Whether this widget is a sliver, to put straight into a
+  /// `CustomScrollView`. Blocks are then built only when scrolled into
+  /// view, which keeps very long replies fast. [fadeBottomEdge] and
+  /// [maxLines] don't apply to a sliver.
+  final bool sliver;
+
   /// The scroll controller of the list that holds this widget.
   ///
   /// When given, the list keeps following the end of the text as it grows,
@@ -333,9 +399,15 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
   Duration _lastTick = Duration.zero;
   bool _followScheduled = false;
 
+  // heading ids are given block by block; see _headingIds
+  final List<int> _idBlocks = [];
+  final Map<String, int> _idCounts = {};
+  final List<MarkdownHeading> _frozenHeadings = [];
+
   @override
   void initState() {
     super.initState();
+    widget.headings?.attach(_settings.anchors);
     _attach();
   }
 
@@ -460,6 +532,10 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
   @override
   void didUpdateWidget(StreamingMarkdown oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.headings != oldWidget.headings) {
+      oldWidget.headings?.detach(_settings.anchors);
+      widget.headings?.attach(_settings.anchors);
+    }
     if (widget.syntax != oldWidget.syntax) {
       _parser = IncrementalMarkdownParser(syntax: widget.syntax);
       _thinkingParser = IncrementalMarkdownParser(syntax: widget.syntax);
@@ -570,6 +646,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     _throttle?.cancel();
     _ticker.dispose();
     _detach();
+    widget.headings?.detach(_settings.anchors);
     super.dispose();
   }
 
@@ -603,6 +680,10 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
         widget.codeBlocks.wrapLines != _settings.codeBlocks.wrapLines ||
         widget.codeBlocks.collapseAfterLines !=
             _settings.codeBlocks.collapseAfterLines ||
+        widget.searchQuery != _settings.searchQuery ||
+        widget.searchHighlightColor != _settings.searchColor ||
+        widget.zoomImages != _settings.zoomImages ||
+        (widget.onImageTap == null) != (_settings.onImageTap == null) ||
         !setEquals(widget.allowedLinkSchemes, _settings.linkSchemes) ||
         !setEquals(widget.allowedImageSchemes, _settings.imageSchemes);
     _settings
@@ -618,6 +699,10 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       ..cursorStyle = widget.cursorStyle
       ..onCitationTap = widget.onCitationTap
       ..codeBlocks = widget.codeBlocks
+      ..searchQuery = widget.searchQuery
+      ..searchColor = widget.searchHighlightColor
+      ..zoomImages = widget.zoomImages
+      ..onImageTap = widget.onImageTap
       ..linkSchemes = widget.allowedLinkSchemes
       ..imageSchemes = widget.allowedImageSchemes
       ..detectTextDirection = widget.detectTextDirection;
@@ -668,6 +753,29 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
         }),
       );
     });
+  }
+
+  // Ids for the headings of new frozen blocks, counted on from the blocks
+  // before; the open block's ids are worked out again every time.
+  List<MarkdownHeading> _headingIds() {
+    final frozen = _parser.frozenBlocks;
+    var same = _idBlocks.length <= frozen.length;
+    for (var i = 0; same && i < _idBlocks.length; i++) {
+      same = frozen[i].id == _idBlocks[i];
+    }
+    if (!same) {
+      _idBlocks.clear();
+      _idCounts.clear();
+      _frozenHeadings.clear();
+    }
+    for (var i = _idBlocks.length; i < frozen.length; i++) {
+      _frozenHeadings.addAll(assignHeadingIds(frozen[i].nodes, _idCounts));
+      _idBlocks.add(frozen[i].id);
+    }
+    return [
+      ..._frozenHeadings,
+      ...assignHeadingIds(_parser.openNodes, Map.of(_idCounts)),
+    ];
   }
 
   ({List<Widget> widgets, bool hasTarget}) _blocks(
@@ -752,6 +860,8 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       changed |= _thinkingParser.update(thinking, complete: split.done);
     }
     if (changed) _followEnd();
+    final headings = _headingIds();
+    widget.headings?.update(headings);
 
     final streaming = !complete;
     _announceWhenDone(complete);
@@ -811,7 +921,43 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       );
     }
 
+    if (widget.sliver) {
+      return SliverList.list(
+        children: [
+          for (var i = 0; i < children.length; i++)
+            Padding(
+              key: children[i].key,
+              padding: EdgeInsets.only(top: i == 0 ? 0 : style.blockSpacing),
+              child: widget.tapToSkip && streaming
+                  ? GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: _skip,
+                      child: children[i],
+                    )
+                  : children[i],
+            ),
+        ],
+      );
+    }
+
     var column = _spaced(children, style.blockSpacing);
+    final maxLines = widget.maxLines;
+    if (maxLines != null) {
+      final line = TextPainter(
+        text: TextSpan(text: 'X', style: style.textStyle),
+        textDirection: TextDirection.ltr,
+        textScaler:
+            MediaQuery.maybeTextScalerOf(context) ?? TextScaler.noScaling,
+      )..layout();
+      final lineHeight = line.height;
+      line.dispose();
+      column = HeightClip(
+        maxHeight: lineHeight * maxLines,
+        fadeHeight: lineHeight,
+        fade: widget.fadeOverflow,
+        child: column,
+      );
+    }
     if (widget.fadeBottomEdge) {
       column = ShaderMask(
         blendMode: BlendMode.dstIn,
