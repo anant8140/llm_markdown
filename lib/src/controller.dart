@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'plain_text.dart';
+
 /// Holds Markdown text that arrives in pieces, such as an AI chat reply.
 ///
 /// Call [append] for each piece and [complete] when the reply has ended.
@@ -26,6 +28,8 @@ class StreamingMarkdownController extends ChangeNotifier {
   bool _isComplete;
   int _generation = 0;
   String _thinking = '';
+  Object? _error;
+  StackTrace? _stackTrace;
 
   /// All Markdown received so far.
   ///
@@ -34,6 +38,15 @@ class StreamingMarkdownController extends ChangeNotifier {
 
   /// Whether the reply has ended.
   bool get isComplete => _isComplete;
+
+  /// The error that ended the reply, if it ended with one.
+  Object? get error => _error;
+
+  /// Where [error] happened, when known.
+  StackTrace? get stackTrace => _stackTrace;
+
+  /// The reply without Markdown marks, for copying as plain text.
+  String get plainText => markdownToPlainText(_text);
 
   /// A number that changes each time [reset] replaces the text.
   ///
@@ -81,6 +94,18 @@ class StreamingMarkdownController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Ends the reply because of [error], for example a dropped connection.
+  ///
+  /// The text received so far stays; `StreamingMarkdown.errorBuilder` can
+  /// show a message or a retry button below it.
+  void completeWithError(Object error, [StackTrace? stackTrace]) {
+    if (_isComplete) return;
+    _error = error;
+    _stackTrace = stackTrace;
+    _isComplete = true;
+    notifyListeners();
+  }
+
   /// Replaces the text with [text], for example to start a new reply.
   ///
   /// A replaced text is shown at once, without smoothing.
@@ -88,6 +113,8 @@ class StreamingMarkdownController extends ChangeNotifier {
     _text = text;
     _isComplete = isComplete;
     _thinking = '';
+    _error = null;
+    _stackTrace = null;
     _generation++;
     notifyListeners();
   }
@@ -95,7 +122,8 @@ class StreamingMarkdownController extends ChangeNotifier {
   /// Appends every chunk of [stream] and completes when it is done.
   ///
   /// Stops early, without completing, if [reset] is called meanwhile. An
-  /// error in [stream] completes the reply and is then rethrown.
+  /// error in [stream] ends the reply with [completeWithError] and is then
+  /// rethrown.
   Future<void> addStream(Stream<String> stream) async {
     final generation = _generation;
     try {
@@ -103,8 +131,10 @@ class StreamingMarkdownController extends ChangeNotifier {
         if (_generation != generation) return;
         append(chunk);
       }
-    } finally {
-      if (_generation == generation) complete();
+    } on Object catch (error, stackTrace) {
+      if (_generation == generation) completeWithError(error, stackTrace);
+      rethrow;
     }
+    if (_generation == generation) complete();
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:markdown/markdown.dart' as md;
@@ -7,6 +9,7 @@ import 'direction.dart';
 import 'fade.dart';
 import 'icons.dart';
 import 'math.dart';
+import 'safety.dart';
 import 'style.dart';
 
 /// Builds a widget for an image, given its address and alternative text.
@@ -54,6 +57,10 @@ class RenderSettings {
   int fadeLength = 0;
 
   bool detectTextDirection = true;
+
+  Set<String> linkSchemes = defaultLinkSchemes;
+
+  Set<String> imageSchemes = defaultImageSchemes;
 }
 
 const Set<String> _textContainers = {
@@ -210,7 +217,20 @@ class _StreamingCursorState extends State<StreamingCursor>
   late final AnimationController _blink = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 530),
-  )..repeat(reverse: true);
+    value: 1,
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      _blink
+        ..stop()
+        ..value = 1;
+    } else if (!_blink.isAnimating) {
+      unawaited(_blink.repeat(reverse: true));
+    }
+  }
 
   @override
   void dispose() {
@@ -474,6 +494,12 @@ class _Builder {
         ];
       case 'a':
         final href = node.attributes['href'] ?? '';
+        if (!isAllowedUrl(href, settings.linkSchemes)) {
+          // shown as text: the model may have produced a harmful link
+          return [
+            for (final child in children) ..._inline(child, textStyle, link),
+          ];
+        }
         final recognizer = recognizers.take()
           ..onTap = () => settings.onLinkTap?.call(href);
         return [
@@ -524,7 +550,9 @@ class _Builder {
 
   Widget _image(String? source, String? alt) {
     final uri = Uri.tryParse(source ?? '');
-    if (uri == null) return Text(alt ?? '');
+    if (uri == null || !isAllowedUrl(source, settings.imageSchemes)) {
+      return Text(alt ?? '', style: style.textStyle);
+    }
     final builder = settings.imageBuilder;
     if (builder != null) return builder(context, uri, alt);
     return Image.network(

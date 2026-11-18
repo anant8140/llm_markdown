@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
@@ -9,6 +10,7 @@ import 'controller.dart';
 import 'direction.dart';
 import 'incremental_parser.dart';
 import 'renderer.dart';
+import 'safety.dart';
 import 'smoothing.dart';
 import 'style.dart';
 import 'thinking.dart';
@@ -54,6 +56,13 @@ class StreamingMarkdown extends StatefulWidget {
     this.thinkingLabel,
     this.announceWhenDone = true,
     this.detectTextDirection = true,
+    this.allowedLinkSchemes = defaultLinkSchemes,
+    this.allowedImageSchemes = defaultImageSchemes,
+    this.tapToSkip = false,
+    this.placeholder,
+    this.errorBuilder,
+    this.onComplete,
+    this.onTextChanged,
     this.autoScrollController,
   }) : stream = null,
        text = null,
@@ -82,6 +91,13 @@ class StreamingMarkdown extends StatefulWidget {
     this.thinkingLabel,
     this.announceWhenDone = true,
     this.detectTextDirection = true,
+    this.allowedLinkSchemes = defaultLinkSchemes,
+    this.allowedImageSchemes = defaultImageSchemes,
+    this.tapToSkip = false,
+    this.placeholder,
+    this.errorBuilder,
+    this.onComplete,
+    this.onTextChanged,
     this.autoScrollController,
   }) : controller = null,
        text = null,
@@ -110,6 +126,13 @@ class StreamingMarkdown extends StatefulWidget {
     this.thinkingLabel,
     this.announceWhenDone = true,
     this.detectTextDirection = true,
+    this.allowedLinkSchemes = defaultLinkSchemes,
+    this.allowedImageSchemes = defaultImageSchemes,
+    this.tapToSkip = false,
+    this.placeholder,
+    this.errorBuilder,
+    this.onComplete,
+    this.onTextChanged,
     this.autoScrollController,
   }) : controller = null,
        stream = null;
@@ -196,6 +219,33 @@ class StreamingMarkdown extends StatefulWidget {
   /// left to right.
   final bool detectTextDirection;
 
+  /// Link schemes that open on tap; others show as plain text. Models can
+  /// produce `javascript:` or `file:` links, which are not allowed by
+  /// default. Links without a scheme are passed on as they are.
+  final Set<String> allowedLinkSchemes;
+
+  /// Image schemes that are loaded; other images show their alt text.
+  final Set<String> allowedImageSchemes;
+
+  /// Whether tapping the reply while it is revealed shows the rest at once.
+  final bool tapToSkip;
+
+  /// Shown instead of the cursor until the first text arrives, for example
+  /// `const MarkdownShimmer()`.
+  final Widget? placeholder;
+
+  /// Builds what is shown below the text when the reply ended with an error
+  /// ([StreamingMarkdownController.completeWithError] or a stream error),
+  /// for example a message and a retry button. When null, stream errors are
+  /// reported to [FlutterError].
+  final Widget Function(BuildContext context, Object error)? errorBuilder;
+
+  /// Called once the whole reply is shown, after it streamed in.
+  final VoidCallback? onComplete;
+
+  /// Called after the shown text changes, with the Markdown shown so far.
+  final ValueChanged<String>? onTextChanged;
+
   /// The scroll controller of the list that holds this widget.
   ///
   /// When given, the list keeps following the end of the text as it grows,
@@ -218,6 +268,8 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
   DateTime? _thinkingStarted;
   Duration? _thinkingTook;
   bool _sawStreaming = false;
+  bool _completePending = false;
+  String? _reportedText;
 
   late final Ticker _ticker = createTicker(_onTick);
   late StreamingMarkdownController _controller;
@@ -261,7 +313,8 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
         _controller.append,
         onDone: _controller.complete,
         onError: (Object error, StackTrace stack) {
-          _controller.complete();
+          _controller.completeWithError(error, stack);
+          if (widget.errorBuilder != null) return;
           FlutterError.reportError(
             FlutterErrorDetails(
               exception: error,
@@ -311,6 +364,44 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     _thinkingStarted = null;
     _thinkingTook = null;
     _sawStreaming = false;
+    _completePending = false;
+    _reportedText = null;
+  }
+
+  // With "reduce motion" on, text shows at once and nothing fades.
+  Smoothing get _smoothing =>
+      (MediaQuery.maybeDisableAnimationsOf(context) ?? false)
+      ? const Smoothing.none()
+      : widget.smoothing;
+
+  void _skip() {
+    if (_shown >= _controller.text.length) return;
+    setState(() {
+      _ticker.stop();
+      _carry = 0;
+      _shown = _controller.text.length;
+    });
+  }
+
+  void _notify(String visible, bool complete) {
+    final onText = widget.onTextChanged;
+    if (onText != null && visible != _reportedText) {
+      _reportedText = visible;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) onText(visible);
+      });
+    }
+    if (!complete) {
+      _completePending = true;
+    } else if (_completePending) {
+      _completePending = false;
+      final onComplete = widget.onComplete;
+      if (onComplete != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) onComplete();
+        });
+      }
+    }
   }
 
   @override
@@ -345,7 +436,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     if (_controller.generation != _generation) {
       _generation = _controller.generation;
       _showAll();
-    } else if (!widget.smoothing.enabled) {
+    } else if (!_smoothing.enabled) {
       _shown = text.length;
     } else if (_shown > text.length) {
       _shown = text.length;
@@ -366,7 +457,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     final seconds =
         (elapsed - _lastTick).inMicroseconds / Duration.microsecondsPerSecond;
     _lastTick = elapsed;
-    _carry += widget.smoothing.speedFor(waiting) * seconds;
+    _carry += _smoothing.speedFor(waiting) * seconds;
     final step = _carry.isFinite ? _carry.floor() : waiting;
     if (step <= 0) return;
     _carry = _carry.isFinite ? _carry - step : 0;
@@ -413,7 +504,9 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
         style != _settings.style ||
         widget.highlightCode != _settings.highlightCode ||
         widget.newlinesAsBreaks != _settings.newlinesAsBreaks ||
-        widget.detectTextDirection != _settings.detectTextDirection;
+        widget.detectTextDirection != _settings.detectTextDirection ||
+        !setEquals(widget.allowedLinkSchemes, _settings.linkSchemes) ||
+        !setEquals(widget.allowedImageSchemes, _settings.imageSchemes);
     _settings
       ..style = style
       ..onLinkTap = widget.onLinkTap
@@ -423,7 +516,9 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       ..newlinesAsBreaks = widget.newlinesAsBreaks
       ..mathBuilder = widget.mathBuilder
       ..showCursor = widget.showCursor
-      ..fadeLength = widget.smoothing.fadeLength
+      ..fadeLength = _smoothing.fadeLength
+      ..linkSchemes = widget.allowedLinkSchemes
+      ..imageSchemes = widget.allowedImageSchemes
       ..detectTextDirection = widget.detectTextDirection;
     if (changed) {
       _blockWidgets.clear();
@@ -559,6 +654,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
 
     final streaming = !complete;
     _announceWhenDone(complete);
+    _notify(visible, complete);
     final answer = _blocks(
       _parser,
       _blockWidgets,
@@ -568,16 +664,26 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     final children = answer.widgets;
     // While the model thinks, the thinking header shows the activity.
     final answering = split.done || thinking == null;
-    if (streaming && answering && widget.showCursor && !answer.hasTarget) {
-      children.add(
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: StreamingCursor(
-            color: style.accentColor,
-            fontSize: style.textStyle.fontSize ?? 14,
+    if (streaming && answering && !answer.hasTarget) {
+      final placeholder = widget.placeholder;
+      if (split.answer.isEmpty && placeholder != null) {
+        children.add(placeholder);
+      } else if (widget.showCursor) {
+        children.add(
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: StreamingCursor(
+              color: style.accentColor,
+              fontSize: style.textStyle.fontSize ?? 14,
+            ),
           ),
-        ),
-      );
+        );
+      }
+    }
+    final error = _controller.error;
+    final errorBuilder = widget.errorBuilder;
+    if (complete && error != null && errorBuilder != null) {
+      children.add(errorBuilder(context, error));
     }
 
     if (thinking != null) {
@@ -603,6 +709,12 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       );
     }
 
-    return _spaced(children, style.blockSpacing);
+    final column = _spaced(children, style.blockSpacing);
+    if (!widget.tapToSkip) return column;
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: streaming ? _skip : null,
+      child: column,
+    );
   }
 }

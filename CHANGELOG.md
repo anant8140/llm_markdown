@@ -7,6 +7,13 @@
 * Code highlighting runs in the background and only builds the grammars it
   needs, so the first code block no longer stalls a frame.
 * A benchmark in `example/lib/benchmark.dart`.
+* Unsafe links (`javascript:`, `file:`, ...) show as text and `data:` images
+  aren't loaded (`allowedLinkSchemes`, `allowedImageSchemes`).
+* `markdownToPlainText`, `controller.plainText` and a `CopyReplyButton`.
+* `tapToSkip`, a `placeholder` such as `MarkdownShimmer` before the first
+  token, `errorBuilder` with `controller.completeWithError`, and
+  `onComplete` / `onTextChanged`.
+* "Reduce motion" turns off the reveal, fade and blinking.
 
 ## 0.2.0
 

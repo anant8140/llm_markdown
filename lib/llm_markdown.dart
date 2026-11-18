@@ -6,7 +6,10 @@
 library;
 
 export 'src/controller.dart' show StreamingMarkdownController;
+export 'src/extras.dart' show CopyReplyButton, MarkdownShimmer;
 export 'src/healer.dart' show healIncompleteMarkdown;
+export 'src/plain_text.dart' show markdownToPlainText;
+export 'src/safety.dart' show defaultImageSchemes, defaultLinkSchemes;
 export 'src/renderer.dart'
     show MarkdownCodeBlockBuilder, MarkdownImageBuilder, MarkdownMathBuilder;
 export 'src/smoothing.dart' show Smoothing;

@@ -100,9 +100,12 @@ class _ThinkingSectionState extends State<ThinkingSection>
     duration: const Duration(milliseconds: 1200),
   );
 
+  bool _still = false;
+
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     _syncDots();
   }
 
@@ -113,7 +116,7 @@ class _ThinkingSectionState extends State<ThinkingSection>
   }
 
   void _syncDots() {
-    if (widget.done) {
+    if (widget.done || _still) {
       _dots.stop();
     } else if (!_dots.isAnimating) {
       _dots.repeat();
@@ -147,6 +150,8 @@ class _ThinkingSectionState extends State<ThinkingSection>
                   builder: (context, _) => Text(
                     widget.done
                         ? widget.label
+                        : _still
+                        ? '${widget.label}...'
                         : '${widget.label}${'.' * (1 + (_dots.value * 3).floor() % 3)}',
                     style: headerStyle,
                   ),
