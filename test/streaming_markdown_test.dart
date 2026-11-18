@@ -215,6 +215,38 @@ void main() {
     expect(highlightCode('x', null, base, style.codeTheme), isNull);
   });
 
+  test('background highlighting gives the same spans', () async {
+    const base = TextStyle();
+    final theme = StreamingMarkdownStyle.fromColors(
+      textStyle: const TextStyle(color: _ink),
+      accentColor: const Color(0xFF1A73E8),
+    ).codeTheme;
+    const code = 'final x = [1, 2, 3].map((n) => n * 2);';
+    final sync = highlightCode(code, 'dart', base, theme)!.toPlainText();
+    final background = await highlightCodeInBackground(
+      code,
+      'dart',
+      base,
+      theme,
+    );
+    expect(background!.toPlainText(), sync);
+    expect(background.children, isNotEmpty);
+  });
+
+  test('aliases and rarer languages still highlight', () {
+    const base = TextStyle();
+    final theme = StreamingMarkdownStyle.fromColors(
+      textStyle: const TextStyle(color: _ink),
+      accentColor: const Color(0xFF1A73E8),
+    ).codeTheme;
+    expect(highlightCode('x = 1', 'py', base, theme), isNotNull);
+    expect(highlightCode('<b>hi</b>', 'html', base, theme), isNotNull);
+    expect(
+      highlightCode('program p\nend program p', 'fortran', base, theme),
+      isNotNull,
+    );
+  });
+
   testWidgets('the copy button copies the code', (tester) async {
     String? copied;
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
