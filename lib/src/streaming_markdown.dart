@@ -52,6 +52,10 @@ class StreamingMarkdown extends StatefulWidget {
 
   /// Shows the chunks of [stream] as they arrive. The reply is complete when
   /// [stream] is done.
+  ///
+  /// A stream can only be read once. Inside a `ListView`, where items are
+  /// disposed and rebuilt while scrolling, keep a [StreamingMarkdownController]
+  /// with the message instead (see [StreamingMarkdownController.addStream]).
   const StreamingMarkdown.stream(
     Stream<String> this.stream, {
     super.key,
@@ -115,6 +119,9 @@ class StreamingMarkdown extends StatefulWidget {
   final ValueChanged<String>? onLinkTap;
 
   /// Builds images; the default loads them with [Image.network].
+  ///
+  /// Blocks that are already built keep what the builder returned, so a new
+  /// function on each rebuild costs nothing.
   final MarkdownImageBuilder? imageBuilder;
 
   /// Builds code blocks, for example to show diagrams; return null to use
@@ -178,27 +185,49 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       );
       final stream = widget.stream;
       if (stream != null) {
-        _subscription = stream.listen(
-          _controller.append,
-          onDone: _controller.complete,
-          onError: (Object error, StackTrace stack) {
-            _controller.complete();
-            FlutterError.reportError(
-              FlutterErrorDetails(
-                exception: error,
-                stack: stack,
-                library: 'llm_markdown',
-                context: ErrorDescription('while reading the Markdown stream'),
-              ),
-            );
-          },
-          cancelOnError: true,
-        );
+        _subscription = _listen(stream);
       }
     }
     _controller.addListener(_onControllerChanged);
     _generation = _controller.generation;
     _showAll();
+  }
+
+  StreamSubscription<String> _listen(Stream<String> stream) {
+    try {
+      return stream.listen(
+        _controller.append,
+        onDone: _controller.complete,
+        onError: (Object error, StackTrace stack) {
+          _controller.complete();
+          FlutterError.reportError(
+            FlutterErrorDetails(
+              exception: error,
+              stack: stack,
+              library: 'llm_markdown',
+              context: ErrorDescription('while reading the Markdown stream'),
+            ),
+          );
+        },
+        cancelOnError: true,
+      );
+    } on StateError {
+      throw FlutterError.fromParts([
+        ErrorSummary(
+          'StreamingMarkdown.stream got a stream that was read before.',
+        ),
+        ErrorDescription(
+          'A single-subscription stream can only be read once. This happens '
+          'when the widget is created again, for example after it scrolled '
+          'out of a ListView and back.',
+        ),
+        ErrorHint(
+          'Keep a StreamingMarkdownController with the message, feed it with '
+          'controller.addStream(stream), and use StreamingMarkdown(controller: '
+          'controller) instead.',
+        ),
+      ]);
+    }
   }
 
   void _detach() {
@@ -228,7 +257,6 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       _detach();
       _attach();
       if (widget.stream != null) {
-        // A new stream starts a new reply, revealed as it arrives.
         _shown = 0;
       }
       return;
@@ -317,9 +345,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     final changed =
         style != _settings.style ||
         widget.highlightCode != _settings.highlightCode ||
-        widget.newlinesAsBreaks != _settings.newlinesAsBreaks ||
-        widget.imageBuilder != _settings.imageBuilder ||
-        widget.codeBlockBuilder != _settings.codeBlockBuilder;
+        widget.newlinesAsBreaks != _settings.newlinesAsBreaks;
     _settings
       ..style = style
       ..onLinkTap = widget.onLinkTap

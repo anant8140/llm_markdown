@@ -294,11 +294,65 @@ void main() {
     expect(scroll.position.maxScrollExtent, greaterThan(0));
     expect(scroll.position.pixels, scroll.position.maxScrollExtent);
 
-    scroll.jumpTo(0);
+    // The user drags up to read: following stops.
+    await tester.drag(find.byType(ListView), const Offset(0, 120));
+    await tester.pump(const Duration(seconds: 1));
+    final reading = scroll.position.pixels;
+    expect(reading, lessThan(scroll.position.maxScrollExtent));
     controller.append('More text\n\n');
     await tester.pump();
     await tester.pump();
-    expect(scroll.position.pixels, 0);
+    expect(scroll.position.pixels, reading);
+
+    // Back at the bottom: following resumes.
+    await tester.drag(find.byType(ListView), const Offset(0, -2000));
+    await tester.pump(const Duration(seconds: 1));
+    for (var i = 0; i < 5; i++) {
+      controller.append('Line after $i\n\n');
+      await tester.pump();
+      await tester.pump();
+    }
+    expect(scroll.position.pixels, scroll.position.maxScrollExtent);
+  });
+
+  testWidgets('keeps following in a lazy list with estimated extents', (
+    tester,
+  ) async {
+    final controller = StreamingMarkdownController();
+    final scroll = ScrollController();
+    addTearDown(scroll.dispose);
+    await tester.pumpWidget(
+      _host(
+        Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            height: 300,
+            child: ListView.builder(
+              controller: scroll,
+              itemCount: 120,
+              itemBuilder: (context, index) => index < 119
+                  ? SizedBox(height: 20.0 + (index % 9) * 37)
+                  : StreamingMarkdown(
+                      controller: controller,
+                      smoothing: const Smoothing.none(),
+                      autoScrollController: scroll,
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+    // Jump to the end the way an app opens a chat at its last message.
+    for (var i = 0; i < 10; i++) {
+      scroll.jumpTo(scroll.position.maxScrollExtent);
+      await tester.pump();
+    }
+    for (var i = 0; i < 40; i++) {
+      controller.append('Streaming line $i with some words in it.\n\n');
+      await tester.pump();
+      await tester.pump();
+    }
+    expect(scroll.position.pixels, scroll.position.maxScrollExtent);
   });
 
   testWidgets('a growing text in text mode streams, a new text replaces', (

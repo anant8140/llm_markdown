@@ -22,28 +22,17 @@ typedef MarkdownCodeBlockBuilder =
       bool isComplete,
     );
 
-/// Settings shared by all blocks of one `StreamingMarkdown` widget.
-///
-/// The widget keeps one instance and updates it in place, so cached block
-/// widgets always call the latest callbacks.
 class RenderSettings {
-  /// The style to draw with.
   StreamingMarkdownStyle? style;
 
-  /// Called with the address of a tapped link.
   ValueChanged<String>? onLinkTap;
 
-  /// Builds images; the default loads them from the network.
   MarkdownImageBuilder? imageBuilder;
 
-  /// Builds code blocks; the default shows language, copy button and
-  /// highlighted code.
   MarkdownCodeBlockBuilder? codeBlockBuilder;
 
-  /// Whether finished code blocks are syntax highlighted.
   bool highlightCode = true;
 
-  /// Whether a single newline inside a paragraph starts a new line.
   bool newlinesAsBreaks = false;
 }
 
@@ -85,11 +74,8 @@ const Set<String> _blockTags = {
 bool _isInline(md.Node node) =>
     node is! md.Element || !_blockTags.contains(node.tag);
 
-/// Returns the element after whose text the streaming cursor goes, or null
-/// when [nodes] end with no text, such as with a horizontal rule.
 md.Element? findCursorTarget(List<md.Node> nodes) {
   for (final node in nodes.reversed) {
-    // Text after the last element, such as raw HTML: no cursor target.
     if (node is! md.Element) return null;
     if (_textContainers.contains(node.tag)) return node;
     final children = node.children ?? const <md.Node>[];
@@ -103,9 +89,7 @@ md.Element? findCursorTarget(List<md.Node> nodes) {
   return null;
 }
 
-/// Draws the top-level [nodes] of one block.
 class MarkdownBlockView extends StatefulWidget {
-  /// Creates a view of [nodes].
   const MarkdownBlockView({
     super.key,
     required this.nodes,
@@ -115,23 +99,16 @@ class MarkdownBlockView extends StatefulWidget {
     this.debugId,
   });
 
-  /// The nodes to draw.
   final List<md.Node> nodes;
 
-  /// The shared settings.
   final RenderSettings settings;
 
-  /// Whether the block will not change any more; code is only highlighted
-  /// in complete blocks.
   final bool isComplete;
 
-  /// The element that gets the streaming cursor, if any.
   final md.Element? cursorTarget;
 
-  /// The block id, used to count builds in tests.
   final int? debugId;
 
-  /// How often each block id was built, counted in debug mode only.
   @visibleForTesting
   static final Map<int, int> debugBuildCounts = {};
 
@@ -139,19 +116,35 @@ class MarkdownBlockView extends StatefulWidget {
   State<MarkdownBlockView> createState() => _MarkdownBlockViewState();
 }
 
-class _MarkdownBlockViewState extends State<MarkdownBlockView> {
-  final List<GestureRecognizer> _recognizers = [];
+class _RecognizerPool {
+  final List<TapGestureRecognizer> _all = [];
+  int _used = 0;
 
-  void _disposeRecognizers() {
-    for (final recognizer in _recognizers) {
-      recognizer.dispose();
-    }
-    _recognizers.clear();
+  TapGestureRecognizer take() {
+    if (_used == _all.length) _all.add(TapGestureRecognizer());
+    return _all[_used++];
   }
+
+  void begin() => _used = 0;
+
+  void end() {
+    while (_all.length > _used) {
+      _all.removeLast().dispose();
+    }
+  }
+
+  void dispose() {
+    _used = 0;
+    end();
+  }
+}
+
+class _MarkdownBlockViewState extends State<MarkdownBlockView> {
+  final _RecognizerPool _recognizers = _RecognizerPool();
 
   @override
   void dispose() {
-    _disposeRecognizers();
+    _recognizers.dispose();
     super.dispose();
   }
 
@@ -165,8 +158,8 @@ class _MarkdownBlockViewState extends State<MarkdownBlockView> {
       }
       return true;
     }());
-    _disposeRecognizers();
-    return _Builder(
+    _recognizers.begin();
+    final result = _Builder(
       context: context,
       settings: widget.settings,
       style: widget.settings.style!,
@@ -174,18 +167,16 @@ class _MarkdownBlockViewState extends State<MarkdownBlockView> {
       cursorTarget: widget.cursorTarget,
       isComplete: widget.isComplete,
     ).blocks(widget.nodes);
+    _recognizers.end();
+    return result;
   }
 }
 
-/// A blinking bar shown at the end of text that is still arriving.
 class StreamingCursor extends StatefulWidget {
-  /// Creates a cursor with [color], sized for text of [fontSize].
   const StreamingCursor({super.key, required this.color, this.fontSize = 14});
 
-  /// The bar color.
   final Color color;
 
-  /// The size of the text the cursor follows.
   final double fontSize;
 
   @override
@@ -235,7 +226,7 @@ class _Builder {
   final BuildContext context;
   final RenderSettings settings;
   final StreamingMarkdownStyle style;
-  final List<GestureRecognizer> recognizers;
+  final _RecognizerPool recognizers;
   final md.Element? cursorTarget;
   final bool isComplete;
   int _listDepth = 0;
@@ -339,7 +330,6 @@ class _Builder {
     return Text.rich(TextSpan(style: textStyle, children: spans));
   }
 
-  /// Raw HTML blocks arrive as text with surrounding newlines.
   void _trimRawHtml(List<InlineSpan> spans) {
     if (spans.length != 1) return;
     final span = spans.single;
@@ -392,9 +382,8 @@ class _Builder {
         ];
       case 'a':
         final href = node.attributes['href'] ?? '';
-        final recognizer = TapGestureRecognizer()
+        final recognizer = recognizers.take()
           ..onTap = () => settings.onLinkTap?.call(href);
-        recognizers.add(recognizer);
         return [
           TextSpan(
             style: style.linkStyle,
