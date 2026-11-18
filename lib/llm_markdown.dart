@@ -7,7 +7,9 @@ library;
 
 export 'src/controller.dart' show StreamingMarkdownController;
 export 'src/healer.dart' show healIncompleteMarkdown;
-export 'src/renderer.dart' show MarkdownCodeBlockBuilder, MarkdownImageBuilder;
+export 'src/renderer.dart'
+    show MarkdownCodeBlockBuilder, MarkdownImageBuilder, MarkdownMathBuilder;
 export 'src/smoothing.dart' show Smoothing;
 export 'src/streaming_markdown.dart' show StreamingMarkdown;
 export 'src/style.dart' show StreamingMarkdownStyle;
+export 'src/thinking.dart' show ThinkingLabelBuilder;

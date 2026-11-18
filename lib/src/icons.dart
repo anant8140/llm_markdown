@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-enum MarkdownIconKind { copy, check, box, checkedBox }
+enum MarkdownIconKind { copy, check, box, checkedBox, chevron }
 
 class MarkdownIcon extends StatelessWidget {
   const MarkdownIcon(
@@ -71,6 +71,14 @@ class _IconPainter extends CustomPainter {
           );
       case MarkdownIconKind.check:
         canvas.drawPath(check(0), stroke);
+      case MarkdownIconKind.chevron:
+        canvas.drawPath(
+          Path()
+            ..moveTo(s * 0.38, s * 0.24)
+            ..lineTo(s * 0.64, s * 0.5)
+            ..lineTo(s * 0.38, s * 0.76),
+          stroke,
+        );
       case MarkdownIconKind.box || MarkdownIconKind.checkedBox:
         final box = RRect.fromRectAndRadius(
           Rect.fromLTWH(s * 0.12, s * 0.12, s * 0.76, s * 0.76),

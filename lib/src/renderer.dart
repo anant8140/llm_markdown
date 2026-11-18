@@ -3,7 +3,9 @@ import 'package:flutter/widgets.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import 'code_block.dart';
+import 'fade.dart';
 import 'icons.dart';
+import 'math.dart';
 import 'style.dart';
 
 /// Builds a widget for an image, given its address and alternative text.
@@ -22,6 +24,15 @@ typedef MarkdownCodeBlockBuilder =
       bool isComplete,
     );
 
+/// Builds a widget for a LaTeX formula, for example with `Math.tex` from
+/// `flutter_math_fork`.
+///
+/// [display] is true for block formulas (`$$...$$`, `\[...\]`) and false
+/// for inline ones (`$...$`, `\(...\)`). Formulas that are still
+/// arriving are not passed to the builder; their source is shown instead.
+typedef MarkdownMathBuilder =
+    Widget Function(BuildContext context, String tex, bool display);
+
 class RenderSettings {
   StreamingMarkdownStyle? style;
 
@@ -34,6 +45,12 @@ class RenderSettings {
   bool highlightCode = true;
 
   bool newlinesAsBreaks = false;
+
+  MarkdownMathBuilder? mathBuilder;
+
+  bool showCursor = true;
+
+  int fadeLength = 0;
 }
 
 const Set<String> _textContainers = {
@@ -47,9 +64,11 @@ const Set<String> _textContainers = {
   'pre',
   'th',
   'td',
+  blockMathTag,
 };
 
 const Set<String> _blockTags = {
+  blockMathTag,
   'p',
   'h1',
   'h2',
@@ -280,7 +299,21 @@ class _Builder {
 
   Widget? _block(md.Element element) {
     switch (element.tag) {
+      case blockMathTag:
+        return _mathBlock(
+          element.textContent,
+          closed: element.attributes['closed'] == 'true',
+          target: identical(element, cursorTarget),
+        );
       case 'p':
+        final only = element.children?.length == 1
+            ? element.children!.single
+            : null;
+        if (only is md.Element &&
+            only.tag == inlineMathTag &&
+            only.attributes['display'] == 'true') {
+          return _mathBlock(only.textContent, closed: true, target: false);
+        }
         return _paragraph(
           element.children ?? const [],
           style.textStyle,
@@ -326,8 +359,44 @@ class _Builder {
       for (final node in nodes) ..._inline(node, textStyle, null),
     ];
     _trimRawHtml(spans);
-    if (cursor) spans.add(_cursor(textStyle));
-    return Text.rich(TextSpan(style: textStyle, children: spans));
+    return Text.rich(
+      TextSpan(
+        style: textStyle,
+        children: cursor ? _streamingTail(spans, textStyle) : spans,
+      ),
+    );
+  }
+
+  // Fade-in and cursor at the end of the text that is still arriving.
+  List<InlineSpan> _streamingTail(List<InlineSpan> spans, TextStyle style) => [
+    ...fadeTail(spans, style, settings.fadeLength),
+    if (settings.showCursor) _cursor(style),
+  ];
+
+  Widget _mathBlock(String tex, {required bool closed, required bool target}) {
+    final builder = settings.mathBuilder;
+    if (closed && builder != null) {
+      return Center(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: builder(context, tex, true),
+        ),
+      );
+    }
+    final source = style.codeBlockTextStyle.copyWith(
+      color: style.codeBlockHeaderStyle.color,
+    );
+    return Center(
+      child: Text.rich(
+        TextSpan(
+          style: source,
+          children: target
+              ? _streamingTail([TextSpan(text: tex)], source)
+              : [TextSpan(text: tex)],
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
   }
 
   void _trimRawHtml(List<InlineSpan> spans) {
@@ -403,6 +472,24 @@ class _Builder {
         ];
       case 'input':
         return [WidgetSpan(child: _checkbox(node, textStyle))];
+      case inlineMathTag:
+        final tex = node.textContent;
+        final display = node.attributes['display'] == 'true';
+        final builder = settings.mathBuilder;
+        if (builder == null) {
+          return [
+            TextSpan(
+              text: display ? '\$\$$tex\$\$' : '\$$tex\$',
+              style: style.inlineCodeStyle,
+            ),
+          ];
+        }
+        return [
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: builder(context, tex, display),
+          ),
+        ];
       case 'sup':
         return styled(TextStyle(fontSize: (textStyle.fontSize ?? 14) * 0.75));
       default:
@@ -511,9 +598,10 @@ class _Builder {
       language: language,
       style: style,
       highlight: isComplete && settings.highlightCode,
-      trailing: identical(pre, cursorTarget)
+      trailing: identical(pre, cursorTarget) && settings.showCursor
           ? _cursor(style.codeBlockTextStyle)
           : null,
+      fadeLength: identical(pre, cursorTarget) ? settings.fadeLength : 0,
     );
   }
 
@@ -540,7 +628,10 @@ class _Builder {
               ..._inline(node, textStyle, null),
           ];
           if (identical(cell, cursorTarget)) {
-            spans.add(_cursor(textStyle));
+            final tail = _streamingTail(spans, textStyle);
+            spans
+              ..clear()
+              ..addAll(tail);
           }
           cells.add(
             Padding(

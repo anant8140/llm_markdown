@@ -147,6 +147,21 @@ After the html.
 ''',
   'non-breaking space is not a blank line':
       'First line\n\u00a0\nstill the same paragraph\n\nNext paragraph\n',
+  'math': r'''
+The area is $\pi r^2$ and the sum is \(\sum_i x_i\). Prices: $5 and $10.
+
+$$
+\int_0^1 x^2 \, dx = \frac{1}{3}
+$$
+Text right after the block.
+
+\[
+E = mc^2
+\]
+
+- a list with $a_1$
+- and $$b$$ inline display
+''',
   'list ends with unindented text after blank line': '''
 - one
 - two

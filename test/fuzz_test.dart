@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:llm_markdown/src/incremental_parser.dart';
+import 'package:llm_markdown/src/math.dart';
 import 'package:markdown/markdown.dart' as md;
 
 // Builds random documents out of pieces that show up in model output, plus
@@ -47,15 +48,18 @@ const _pieces = [
   'Line with trailing spaces  \n',
   'CRLF line\r\n',
   '\u00a0\n',
+  'Inline \$x^2\$ and \\(a+b\\) math, costs \$5 and \$10.\n',
+  '\$\$\nE = mc^2\n\$\$\n',
+  '\$\$\n\\frac{a}{b}\n\n\$\$\n',
+  '\\[\nx_1\n\\]\n',
+  'Display \$\$\\sum_i i\$\$ inline.\n',
+  '\$\$\n',
   'emoji 🚀 and ગુજરાતી\n',
   '[link](https://dart.dev) and https://flutter.dev\n',
   '![img](https://example.com/a.png)\n',
 ];
 
-md.Document _document() => md.Document(
-  extensionSet: md.ExtensionSet.gitHubFlavored,
-  encodeHtml: false,
-);
+md.Document _document() => newMarkdownDocument();
 
 String _html(md.Node node) =>
     node is md.Text ? node.text.trim() : md.renderToHtml([node]);

@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:re_highlight/languages/all.dart';
 import 'package:re_highlight/re_highlight.dart';
 
+import 'fade.dart';
 import 'icons.dart';
 import 'style.dart';
 
@@ -42,7 +43,10 @@ class CodeBlockView extends StatefulWidget {
     required this.style,
     required this.highlight,
     this.trailing,
+    this.fadeLength = 0,
   });
+
+  final int fadeLength;
 
   final String code;
 
@@ -120,7 +124,13 @@ class _CodeBlockViewState extends State<CodeBlockView> {
     final code = TextSpan(
       style: style.codeBlockTextStyle,
       children: [
-        _highlighted ?? TextSpan(text: widget.code),
+        ...(_highlighted == null
+            ? fadeTail(
+                [TextSpan(text: widget.code)],
+                style.codeBlockTextStyle,
+                widget.fadeLength,
+              )
+            : [_highlighted!]),
         if (widget.trailing != null) widget.trailing!,
       ],
     );

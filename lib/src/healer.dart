@@ -1,4 +1,5 @@
 import 'block_splitter.dart';
+import 'math.dart';
 
 final RegExp _partialMarkerLine = RegExp(
   r'^[ \t]*(?:`{1,2}|~{1,2}|#{1,6}|[-+*]|\d{1,2}[.)]?|\d{3,9}[.)]|>)[ \t]*$',
@@ -39,9 +40,19 @@ String healIncompleteMarkdown(String source) {
 
   OpenFence? fence;
   var fenceLine = -1;
+  RegExp? mathEnd;
   for (var i = 0; i < lines.length; i++) {
     final line = withoutCarriageReturn(lines[i]);
+    if (mathEnd != null) {
+      if (mathEnd.hasMatch(line)) mathEnd = null;
+      continue;
+    }
     if (fence == null) {
+      final math = mathBlockOpener.firstMatch(line);
+      if (math != null) {
+        mathEnd = mathBlockCloserFor(math[1]!);
+        continue;
+      }
       final opened = fenceOpenedBy(line);
       if (opened != null) {
         fence = opened;
@@ -51,6 +62,8 @@ String healIncompleteMarkdown(String source) {
       fence = null;
     }
   }
+  // an open math block is shown as source, nothing to heal
+  if (mathEnd != null) return source;
   if (fence != null) {
     return _closeFence(lines, fence, fenceLine, endsWithNewline);
   }

@@ -4,6 +4,7 @@ import 'package:markdown/markdown.dart' as md;
 
 import 'block_splitter.dart';
 import 'healer.dart';
+import 'math.dart';
 
 // Footnotes need the whole document (numbering, the list at the end), so
 // once a definition shows up we stop splitting. Rare in practice.
@@ -47,10 +48,7 @@ class IncrementalMarkdownParser {
 
   bool get isComplete => _complete;
 
-  static md.Document _newDocument() => md.Document(
-    extensionSet: md.ExtensionSet.gitHubFlavored,
-    encodeHtml: false,
-  );
+  static md.Document _newDocument() => newMarkdownDocument();
 
   void reset() {
     _document = _newDocument();

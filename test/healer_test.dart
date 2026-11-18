@@ -54,6 +54,9 @@ void main() {
     'Steps:\n12': 'Steps:\n',
     '2*3': '2*3',
     'x * y': 'x * y',
+    // Math that is still arriving is left as it is.
+    '\$\$\nx^*': '\$\$\nx^*',
+    '\$\$\na_1 \\\\\n-': '\$\$\na_1 \\\\\n-',
     // Complete Markdown stays as it is.
     '# Title\n\nSome **bold** text.\n': '# Title\n\nSome **bold** text.\n',
     'x\n\n': 'x\n\n',

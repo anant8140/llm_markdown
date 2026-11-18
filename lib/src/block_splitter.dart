@@ -2,6 +2,8 @@
 // When unsure, don't cut. A missed cut costs a re-parse, a wrong one shows
 // the wrong output.
 
+import 'math.dart';
+
 final RegExp _listMarker = RegExp(r'^ {0,3}(?:[-+*]|\d{1,9}[.)])(?:[ \t]|$)');
 final RegExp _partialListMarker = RegExp(r'^ {0,3}(?:[-+*]|\d{1,9}[.)]?)$');
 final RegExp _footnoteDefinition = RegExp(r'^ {0,3}\[\^[^\]]+\]:');
@@ -90,6 +92,7 @@ List<int> findBlockBoundaries(
   var afterBlank = false;
   var inHtmlBlock = false;
   OpenFence? fence;
+  RegExp? mathEnd;
   RegExp? htmlEnd;
 
   void startBlockAt(int offset) {
@@ -114,6 +117,15 @@ List<int> findBlockBoundaries(
     if (fence != null) {
       if (lineComplete && fence.isClosedBy(line)) {
         fence = null;
+        startBlockAt(next);
+      }
+      pos = next;
+      continue;
+    }
+
+    if (mathEnd != null) {
+      if (lineComplete && mathEnd.hasMatch(line)) {
+        mathEnd = null;
         startBlockAt(next);
       }
       pos = next;
@@ -153,6 +165,17 @@ List<int> findBlockBoundaries(
     final nested = continuable && indent > 0;
 
     if (indent <= 3 && !nested && !inHtmlBlock) {
+      final math = mathBlockOpener.firstMatch(line);
+      if (math != null) {
+        // "$$" could still become "$$x$$" on one line
+        if (!lineComplete) break;
+        if (hasContent) startBlockAt(pos);
+        mathEnd = mathBlockCloserFor(math[1]!);
+        hasContent = true;
+        pos = next;
+        continue;
+      }
+
       final opener = _fenceOpener.firstMatch(line);
       if (opener != null) {
         // ```foo``` is inline code, wait for the whole line

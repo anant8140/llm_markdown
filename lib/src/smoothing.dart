@@ -14,13 +14,18 @@ class Smoothing {
   const Smoothing.none()
     : enabled = false,
       charactersPerSecond = 0,
-      maxLag = Duration.zero;
+      maxLag = Duration.zero,
+      fadeLength = 0;
 
   /// Reveals text at no less than [charactersPerSecond], and faster when
   /// more text is waiting than can be shown within [maxLag].
+  ///
+  /// The last [fadeLength] characters fade in as they appear; 0 turns the
+  /// fade off.
   const Smoothing.adaptive({
     this.charactersPerSecond = 120,
     this.maxLag = const Duration(milliseconds: 500),
+    this.fadeLength = 12,
   }) : enabled = true,
        assert(charactersPerSecond > 0, 'charactersPerSecond must be > 0');
 
@@ -32,6 +37,9 @@ class Smoothing {
 
   /// About how far the view may fall behind the text that has arrived.
   final Duration maxLag;
+
+  /// How many of the newest characters fade in.
+  final int fadeLength;
 
   /// The reveal speed, in code units per second, when [waiting] code units
   /// have arrived but are not shown yet.
@@ -46,10 +54,12 @@ class Smoothing {
       other is Smoothing &&
       other.enabled == enabled &&
       other.charactersPerSecond == charactersPerSecond &&
-      other.maxLag == maxLag;
+      other.maxLag == maxLag &&
+      other.fadeLength == fadeLength;
 
   @override
-  int get hashCode => Object.hash(enabled, charactersPerSecond, maxLag);
+  int get hashCode =>
+      Object.hash(enabled, charactersPerSecond, maxLag, fadeLength);
 }
 
 int graphemeBoundaryAtOrAfter(String text, int index) {

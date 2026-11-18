@@ -9,6 +9,7 @@ import 'incremental_parser.dart';
 import 'renderer.dart';
 import 'smoothing.dart';
 import 'style.dart';
+import 'thinking.dart';
 
 /// Shows Markdown that arrives in pieces, such as an AI chat reply, without
 /// flicker or broken syntax.
@@ -45,6 +46,10 @@ class StreamingMarkdown extends StatefulWidget {
     this.highlightCode = true,
     this.showCursor = true,
     this.newlinesAsBreaks = false,
+    this.mathBuilder,
+    this.showThinking = true,
+    this.thinkingInitiallyExpanded = false,
+    this.thinkingLabel,
     this.autoScrollController,
   }) : stream = null,
        text = null,
@@ -67,6 +72,10 @@ class StreamingMarkdown extends StatefulWidget {
     this.highlightCode = true,
     this.showCursor = true,
     this.newlinesAsBreaks = false,
+    this.mathBuilder,
+    this.showThinking = true,
+    this.thinkingInitiallyExpanded = false,
+    this.thinkingLabel,
     this.autoScrollController,
   }) : controller = null,
        text = null,
@@ -89,6 +98,10 @@ class StreamingMarkdown extends StatefulWidget {
     this.highlightCode = true,
     this.showCursor = true,
     this.newlinesAsBreaks = false,
+    this.mathBuilder,
+    this.showThinking = true,
+    this.thinkingInitiallyExpanded = false,
+    this.thinkingLabel,
     this.autoScrollController,
   }) : controller = null,
        stream = null;
@@ -139,6 +152,29 @@ class StreamingMarkdown extends StatefulWidget {
   /// Markdown treats it as a space; many chat apps show it as a line break.
   final bool newlinesAsBreaks;
 
+  /// Builds LaTeX formulas. Without it the formula source is shown.
+  ///
+  /// ```dart
+  /// // with package:flutter_math_fork
+  /// mathBuilder: (context, tex, display) => Math.tex(
+  ///   tex,
+  ///   mathStyle: display ? MathStyle.display : MathStyle.text,
+  /// ),
+  /// ```
+  final MarkdownMathBuilder? mathBuilder;
+
+  /// Whether to show the model's reasoning, from `<think>...</think>` at the
+  /// start of the reply or from [StreamingMarkdownController.appendThinking],
+  /// in a section the user can open. When false it is left out.
+  final bool showThinking;
+
+  /// Whether the thinking section starts open.
+  final bool thinkingInitiallyExpanded;
+
+  /// The thinking section's title; defaults to "Thinking" and
+  /// "Thought for 12s". Use it to translate the title.
+  final ThinkingLabelBuilder? thinkingLabel;
+
   /// The scroll controller of the list that holds this widget.
   ///
   /// When given, the list keeps following the end of the text as it grows,
@@ -156,6 +192,10 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
   final IncrementalMarkdownParser _parser = IncrementalMarkdownParser();
   final RenderSettings _settings = RenderSettings();
   final Map<int, Widget> _blockWidgets = {};
+  final IncrementalMarkdownParser _thinkingParser = IncrementalMarkdownParser();
+  final Map<int, Widget> _thinkingWidgets = {};
+  DateTime? _thinkingStarted;
+  Duration? _thinkingTook;
 
   late final Ticker _ticker = createTicker(_onTick);
   late StreamingMarkdownController _controller;
@@ -244,6 +284,10 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     _shown = _controller.text.length;
     _parser.reset();
     _blockWidgets.clear();
+    _thinkingParser.reset();
+    _thinkingWidgets.clear();
+    _thinkingStarted = null;
+    _thinkingTook = null;
   }
 
   @override
@@ -352,9 +396,79 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       ..imageBuilder = widget.imageBuilder
       ..codeBlockBuilder = widget.codeBlockBuilder
       ..highlightCode = widget.highlightCode
-      ..newlinesAsBreaks = widget.newlinesAsBreaks;
-    if (changed) _blockWidgets.clear();
+      ..newlinesAsBreaks = widget.newlinesAsBreaks
+      ..mathBuilder = widget.mathBuilder
+      ..showCursor = widget.showCursor
+      ..fadeLength = widget.smoothing.fadeLength;
+    if (changed) {
+      _blockWidgets.clear();
+      _thinkingWidgets.clear();
+    }
   }
+
+  // Times the thinking phase, but only when it was seen starting; a reply
+  // loaded from history shows "Thoughts" instead of a made-up duration.
+  void _trackThinking(ThinkingSplit split) {
+    if (split.thinking == null) return;
+    if (!split.done) {
+      _thinkingStarted ??= DateTime.now();
+    } else if (_thinkingTook == null && _thinkingStarted != null) {
+      _thinkingTook = DateTime.now().difference(_thinkingStarted!);
+    }
+  }
+
+  ({List<Widget> widgets, bool hasTarget}) _blocks(
+    IncrementalMarkdownParser parser,
+    Map<int, Widget> cache, {
+    required bool streaming,
+    required bool countBuilds,
+  }) {
+    final frozen = parser.frozenBlocks;
+    if (cache.length > frozen.length) {
+      final ids = {for (final block in frozen) block.id};
+      cache.removeWhere((id, _) => !ids.contains(id));
+    }
+    final widgets = <Widget>[
+      for (final block in frozen)
+        cache.putIfAbsent(
+          block.id,
+          () => RepaintBoundary(
+            key: ValueKey<int>(block.id),
+            child: MarkdownBlockView(
+              nodes: block.nodes,
+              settings: _settings,
+              isComplete: true,
+              debugId: countBuilds ? block.id : null,
+            ),
+          ),
+        ),
+    ];
+    final open = parser.openNodes;
+    final target = streaming ? findCursorTarget(open) : null;
+    if (open.isNotEmpty) {
+      widgets.add(
+        MarkdownBlockView(
+          key: const ValueKey<String>('open'),
+          nodes: open,
+          settings: _settings,
+          isComplete: false,
+          cursorTarget: target,
+        ),
+      );
+    }
+    return (widgets: widgets, hasTarget: target != null);
+  }
+
+  Widget _spaced(List<Widget> children, double spacing) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (var i = 0; i < children.length; i++) ...[
+        if (i > 0) SizedBox(height: spacing),
+        children[i],
+      ],
+    ],
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -364,47 +478,35 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     final text = _controller.text;
     final visible = _shown >= text.length ? text : text.substring(0, _shown);
     final complete = _controller.isComplete && _shown >= text.length;
-    if (_parser.update(visible, complete: complete)) _followEnd();
 
-    final frozen = _parser.frozenBlocks;
-    if (_blockWidgets.length > frozen.length) {
-      final ids = {for (final block in frozen) block.id};
-      _blockWidgets.removeWhere((id, _) => !ids.contains(id));
-    }
-
-    final children = <Widget>[
-      for (final block in frozen)
-        _blockWidgets.putIfAbsent(
-          block.id,
-          () => RepaintBoundary(
-            key: ValueKey<int>(block.id),
-            child: MarkdownBlockView(
-              nodes: block.nodes,
-              settings: _settings,
-              isComplete: true,
-              debugId: block.id,
-            ),
-          ),
-        ),
-    ];
-
-    final streaming = !complete;
-    final open = _parser.openNodes;
-    final cursorTarget = streaming && widget.showCursor
-        ? findCursorTarget(open)
-        : null;
-    if (open.isNotEmpty) {
-      children.add(
-        MarkdownBlockView(
-          key: const ValueKey<String>('open'),
-          nodes: open,
-          settings: _settings,
-          isComplete: false,
-          cursorTarget: cursorTarget,
-        ),
+    var split = splitThinking(visible, complete: complete);
+    if (_controller.thinking.isNotEmpty) {
+      split = ThinkingSplit(
+        _controller.thinking,
+        visible,
+        done: visible.isNotEmpty || complete,
       );
     }
-    if (streaming && widget.showCursor && cursorTarget == null) {
+    _trackThinking(split);
+    final thinking = widget.showThinking ? split.thinking : null;
+
+    var changed = _parser.update(split.answer, complete: complete);
+    if (thinking != null) {
+      changed |= _thinkingParser.update(thinking, complete: split.done);
+    }
+    if (changed) _followEnd();
+
+    final streaming = !complete;
+    final answer = _blocks(
+      _parser,
+      _blockWidgets,
+      streaming: streaming,
+      countBuilds: true,
+    );
+    final children = answer.widgets;
+    // While the model thinks, the thinking header shows the activity.
+    final answering = split.done || thinking == null;
+    if (streaming && answering && widget.showCursor && !answer.hasTarget) {
       children.add(
         Align(
           alignment: AlignmentDirectional.centerStart,
@@ -416,15 +518,29 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var i = 0; i < children.length; i++) ...[
-          if (i > 0) SizedBox(height: style.blockSpacing),
-          children[i],
-        ],
-      ],
-    );
+    if (thinking != null) {
+      final thought = _blocks(
+        _thinkingParser,
+        _thinkingWidgets,
+        streaming: !split.done,
+        countBuilds: false,
+      );
+      children.insert(
+        0,
+        ThinkingSection(
+          label: (widget.thinkingLabel ?? defaultThinkingLabel)(
+            split.done,
+            split.done ? _thinkingTook : null,
+          ),
+          done: split.done,
+          color: style.codeBlockHeaderStyle.color ?? style.accentColor,
+          textStyle: style.textStyle,
+          initiallyExpanded: widget.thinkingInitiallyExpanded,
+          child: _spaced(thought.widgets, style.blockSpacing),
+        ),
+      );
+    }
+
+    return _spaced(children, style.blockSpacing);
   }
 }

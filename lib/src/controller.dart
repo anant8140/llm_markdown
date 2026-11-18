@@ -25,6 +25,7 @@ class StreamingMarkdownController extends ChangeNotifier {
   String _text;
   bool _isComplete;
   int _generation = 0;
+  String _thinking = '';
 
   /// All Markdown received so far.
   ///
@@ -54,6 +55,25 @@ class StreamingMarkdownController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The model's reasoning, for APIs that send it apart from the answer.
+  ///
+  /// Replies that start with `<think>...</think>` don't need this; the tags
+  /// are picked up from [text].
+  String get thinking => _thinking;
+
+  /// Adds [chunk] to [thinking].
+  void appendThinking(String chunk) {
+    if (_isComplete) {
+      throw StateError(
+        'Cannot append to a completed StreamingMarkdownController. '
+        'Call reset() to start a new reply.',
+      );
+    }
+    if (chunk.isEmpty) return;
+    _thinking += chunk;
+    notifyListeners();
+  }
+
   /// Marks the reply as ended.
   void complete() {
     if (_isComplete) return;
@@ -67,6 +87,7 @@ class StreamingMarkdownController extends ChangeNotifier {
   void reset([String text = '', bool isComplete = false]) {
     _text = text;
     _isComplete = isComplete;
+    _thinking = '';
     _generation++;
     notifyListeners();
   }

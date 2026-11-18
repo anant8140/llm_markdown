@@ -2,14 +2,12 @@ import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:llm_markdown/src/incremental_parser.dart';
+import 'package:llm_markdown/src/math.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import 'support/corpus.dart';
 
-md.Document _document() => md.Document(
-  extensionSet: md.ExtensionSet.gitHubFlavored,
-  encodeHtml: false,
-);
+md.Document _document() => newMarkdownDocument();
 
 /// Renders one top-level node. Raw HTML blocks are top-level text nodes, and
 /// the markdown package starts one with a newline when a blank line precedes
