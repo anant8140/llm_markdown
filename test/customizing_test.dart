@@ -130,6 +130,30 @@ void main() {
     expect(find.text('Title'), findsOneWidget);
   });
 
+  testWidgets('a diagram block waits for its closing fence', (tester) async {
+    final controller = StreamingMarkdownController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      _host(
+        StreamingMarkdown(
+          controller: controller,
+          smoothing: const Smoothing.none(),
+          // the README's Mermaid recipe
+          codeBlockBuilder: (context, code, language, isComplete) {
+            if (language != 'mermaid') return null;
+            return Text(isComplete ? 'DIAGRAM ${code.trim()}' : 'drawing…');
+          },
+        ),
+      ),
+    );
+    controller.append('```mermaid\ngraph TD; A-->B');
+    await tester.pump();
+    expect(find.text('drawing…'), findsOneWidget);
+    controller.append('\n```\n');
+    await tester.pump();
+    expect(find.text('DIAGRAM graph TD; A-->B'), findsOneWidget);
+  });
+
   testWidgets('blockPadding pads blocks by tag', (tester) async {
     final style = StreamingMarkdownStyle.fromColors(
       textStyle: const TextStyle(fontSize: 14, color: Color(0xFF202124)),

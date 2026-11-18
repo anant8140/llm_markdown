@@ -1,7 +1,7 @@
 import 'package:markdown/markdown.dart' as md;
 
 import 'math.dart';
-import 'thinking.dart';
+import 'thinking_split.dart';
 
 /// Returns [markdown] as plain text, for example to copy a reply into an app
 /// that doesn't understand Markdown.

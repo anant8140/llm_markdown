@@ -43,4 +43,5 @@ jobs:
       # the example targets the latest Flutter only
       - run: flutter pub get --no-example
       - run: flutter analyze lib test
-      - run: flutter test
+      # the pictures in test/goldens are made with the newer Flutter
+      - run: flutter test --exclude-tags golden

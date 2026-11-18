@@ -4,6 +4,8 @@ import 'package:flutter/widgets.dart';
 
 import 'icons.dart';
 
+export 'thinking_split.dart';
+
 /// Returns the title of the thinking section.
 ///
 /// [duration] is how long the model thought, or null while it is still
@@ -15,59 +17,6 @@ String defaultThinkingLabel(bool done, Duration? duration) {
   if (!done) return 'Thinking';
   if (duration == null) return 'Thoughts';
   return 'Thought for ${math.max(1, duration.inSeconds)}s';
-}
-
-class ThinkingSplit {
-  const ThinkingSplit(this.thinking, this.answer, {required this.done});
-
-  // null when the text has no thinking part
-  final String? thinking;
-  final String answer;
-  final bool done;
-}
-
-const _tags = [('<think>', '</think>'), ('<thinking>', '</thinking>')];
-final RegExp _leadingBlankLines = RegExp(r'^(?:[ \t]*\r?\n)+');
-
-// Models like DeepSeek R1 and Qwen put their reasoning in <think>...</think>
-// at the start of the reply.
-ThinkingSplit splitThinking(String text, {required bool complete}) {
-  final start = text.length - text.trimLeft().length;
-  final rest = text.substring(start);
-  for (final (open, close) in _tags) {
-    if (rest.startsWith(open)) {
-      final body = rest.substring(open.length);
-      final end = body.indexOf(close);
-      if (end == -1) {
-        return ThinkingSplit(
-          complete ? body : _withoutPartial(body, close),
-          '',
-          done: complete,
-        );
-      }
-      return ThinkingSplit(
-        body.substring(0, end),
-        body.substring(end + close.length).replaceFirst(_leadingBlankLines, ''),
-        done: true,
-      );
-    }
-  }
-  // "<thi" might still become "<think>"
-  if (!complete &&
-      rest.isNotEmpty &&
-      _tags.any((tag) => tag.$1.startsWith(rest))) {
-    return const ThinkingSplit('', '', done: false);
-  }
-  return ThinkingSplit(null, text, done: true);
-}
-
-String _withoutPartial(String body, String close) {
-  for (var length = close.length - 1; length > 0; length--) {
-    if (body.endsWith(close.substring(0, length))) {
-      return body.substring(0, body.length - length);
-    }
-  }
-  return body;
 }
 
 class ThinkingSection extends StatefulWidget {

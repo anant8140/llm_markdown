@@ -77,11 +77,13 @@ class MathBlockSyntax extends md.BlockSyntax {
   }
 }
 
+/// A `package:markdown` document with GitHub-flavored Markdown and the
+/// extensions turned on in [syntax], as `StreamingMarkdown` parses it.
 md.Document newMarkdownDocument([
   MarkdownSyntax syntax = const MarkdownSyntax(),
 ]) {
   final gfm = md.ExtensionSet.gitHubFlavored;
-  return md.Document(
+  return _SafeDocument(
     extensionSet: md.ExtensionSet(gfm.blockSyntaxes, [
       for (final s in gfm.inlineSyntaxes)
         if (syntax.autolinks || s is! md.AutolinkExtensionSyntax) s,
@@ -104,6 +106,40 @@ md.Document newMarkdownDocument([
     ],
     encodeHtml: false,
   );
+}
+
+// A link definition whose line ends in a backslash, like "[a]: /b\".
+final RegExp _definitionEndingInBackslash = RegExp(
+  r'^([ \t>]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?\[[^\]]+\]:[ \t]*\S*\\)$',
+  multiLine: true,
+);
+
+// The markdown package must never take the app down with it.
+class _SafeDocument extends md.Document {
+  _SafeDocument({
+    super.extensionSet,
+    super.blockSyntaxes,
+    super.inlineSyntaxes,
+    super.encodeHtml,
+  });
+
+  @override
+  List<md.Node> parse(String text) {
+    // markdown 7.3 reads past the end of such a line; a space after the
+    // destination changes nothing and avoids it
+    final safe = text.replaceAllMapped(
+      _definitionEndingInBackslash,
+      (match) => '${match[1]} ',
+    );
+    try {
+      return super.parse(safe);
+    } catch (_) {
+      // any other parser bug: show the text as it is
+      return [
+        md.Element('p', [md.Text(text)]),
+      ];
+    }
+  }
 }
 
 const Map<String, String> _symbols = {
@@ -209,8 +245,8 @@ String? _script(String body, String digits, Map<String, String> other) {
   return out.toString();
 }
 
-// A readable plain-text version of simple TeX, for when no math renderer
-// is plugged in: \alpha -> α, x^2 -> x², \frac{a}{b} -> (a)/(b).
+/// A readable plain-text version of simple TeX, for when no math renderer
+/// is plugged in: `\alpha` becomes α, `x^2` x² and `\frac{a}{b}` (a)/(b).
 String texToUnicode(String tex) {
   var text = tex.replaceAllMapped(
     RegExp(r'\\frac\{([^{}]*)\}\{([^{}]*)\}'),

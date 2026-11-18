@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 import 'package:markdown/markdown.dart' as md;
 
 const String citationTag = 'cite';
@@ -80,7 +80,8 @@ class MarkdownSyntax {
       other.inlineHtml == inlineHtml &&
       other.details == details &&
       other.autolinks == autolinks &&
-      setEquals(other.autolinkSchemes, autolinkSchemes) &&
+      other.autolinkSchemes.length == autolinkSchemes.length &&
+      other.autolinkSchemes.containsAll(autolinkSchemes) &&
       _sameSyntaxes(other.blockSyntaxes, blockSyntaxes) &&
       _sameSyntaxes(other.inlineSyntaxes, inlineSyntaxes);
 

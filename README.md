@@ -33,7 +33,16 @@ This package fixes that:
 - Screen readers don't read half sentences; the reply is announced once
   it's done. Arabic, Hebrew and other right-to-left text gets the right
   direction per paragraph, even in a left-to-right app.
-- Optional auto-scroll that stops when the user scrolls up to read.
+- Optional auto-scroll that stops when the user scrolls up to read, and a
+  "jump to latest" button.
+- GitHub extras: alerts (`> [!NOTE]`), footnotes, task lists, tables,
+  `<details>`, plus citation chips (`[1]`), `==highlight==`, `||spoiler||`,
+  `:emoji:` and a few safe HTML tags.
+- Code blocks with line numbers, wrapping, collapsing, 13 themes and your
+  own header buttons.
+- Find-in-chat highlighting, a table of contents, image zoom, previews with
+  `maxLines`, and a sliver mode for very long replies.
+- Your own syntaxes and widgets for any element.
 - Depends only on `flutter/widgets.dart`, so it works with `material_ui`, the
   old `flutter/material.dart`, Cupertino or no design library at all.
 
@@ -140,21 +149,127 @@ selectable. With `ListView(reverse: true)` you don't need
 
 | Option | Default | |
 | --- | --- | --- |
-| `smoothing` | `Smoothing.adaptive()` | `Smoothing.none()` shows text right away; `fadeLength: 0` turns the fade off |
-| `mathBuilder` | – | draws LaTeX, see above |
-| `showThinking` | `true` | |
-| `thinkingInitiallyExpanded` | `false` | |
-| `thinkingLabel` | English | title of the thinking section |
-| `style` | from context | see below |
+| `smoothing` | `Smoothing.adaptive()` | also `.none()`, `.gentle()`, `.fast()`, `.typewriter()`, `.wordByWord()`; `fadeLength: 0` turns the fade off |
+| `style` | from context | see [Styling](#styling) |
 | `onLinkTap` | – | called with the link URL |
+| `allowedLinkSchemes` / `allowedImageSchemes` | http, https, mailto, tel / http, https | other links show as text |
+| `onCitationTap` | – | called with `1` for a `[1]` chip |
 | `imageBuilder` | `Image.network` | |
+| `onImageTap` / `zoomImages` | – / `true` | a tap opens the image full screen with pinch-to-zoom |
 | `codeBlockBuilder` | built-in | return `null` to fall back to the default |
+| `codeBlocks` | `CodeBlockOptions()` | see [Code blocks](#code-blocks) |
 | `highlightCode` | `true` | |
-| `showCursor` | `true` | blinking cursor while streaming |
+| `mathBuilder` | – | draws LaTeX, see above; without it math shows as Unicode (`x²`, `α`) |
+| `showThinking` / `thinkingInitiallyExpanded` / `thinkingLabel` | `true` / `false` / English | |
+| `showCursor` / `cursorStyle` | `true` / block | also bar, underline, dots |
+| `placeholder` | – | shown until the first text arrives, e.g. `MarkdownShimmer()` |
+| `errorBuilder` | – | shown after `controller.completeWithError(error)` |
+| `onComplete` / `onTextChanged` | – | |
+| `tapToSkip` | `false` | a tap shows the rest of the reply at once |
+| `updateInterval` | every frame | rebuild less often on slow phones |
+| `fadeBottomEdge` | `false` | fade the last line while text arrives |
 | `newlinesAsBreaks` | `false` | treat a single newline as a line break |
 | `autoScrollController` | – | follow the reply while at the bottom |
+| `headings` | – | a `MarkdownHeadings` for a table of contents |
+| `searchQuery` / `searchHighlightColor` | – | marks matches, ignoring case |
+| `maxLines` / `fadeOverflow` | – / `true` | previews |
+| `sliver` | `false` | builds blocks lazily inside a `CustomScrollView` |
+| `syntax` | everything on | `MarkdownSyntax(dollarMath: false, ...)`, your own syntaxes |
+| `elementBuilders` | – | your widget for any element, by tag |
 | `announceWhenDone` | `true` | screen readers read the reply when it ends |
 | `detectTextDirection` | `true` | per-paragraph direction from the first letter |
+
+The controller can `pause()`, `resume()`, `skipAnimation()` and `replay()`,
+and reads model streams directly:
+
+```dart
+// the raw bytes of a streaming response, reasoning included
+await controller.addOpenAIStream(response.stream);
+await controller.addAnthropicStream(response.stream);
+```
+
+### Code blocks
+
+```dart
+StreamingMarkdown(
+  controller: controller,
+  codeBlocks: CodeBlockOptions(
+    lineNumbers: true,
+    collapseAfterLines: 30,
+    highlightWhileStreaming: true,
+    actionsBuilder: (context, code, language) => [
+      if (language == 'python') TextButton(onPressed: () => run(code), child: Text('Run')),
+    ],
+  ),
+  style: StreamingMarkdownStyle.of(context).copyWith(codeTheme: CodeThemes.githubDark),
+)
+```
+
+`wrapLines` wraps long lines instead of scrolling sideways, and
+`copyButtonBuilder` replaces the copy button. For your own code font, pass
+`monospace:` to `StreamingMarkdownStyle.fromColors`, e.g.
+`GoogleFonts.jetBrainsMono()`.
+
+### Long replies and chats
+
+```dart
+final headings = MarkdownHeadings();
+
+StreamingMarkdown(controller: controller, headings: headings, searchQuery: query);
+
+// a table of contents
+for (final heading in headings.headings)
+  GestureDetector(onTap: () => headings.scrollTo(heading.id), child: Text(heading.text));
+
+// over the chat list, in a Stack
+JumpToLatest(
+  controller: scrollController,
+  content: controller,
+  builder: (context, jump) => FilledButton(onPressed: jump, child: Text('New messages')),
+)
+```
+
+Headings get GitHub's ids, so `[Setup](#setup)` links scroll too. For a
+reply with thousands of lines, `sliver: true` puts the blocks straight into a
+`CustomScrollView` and builds only those on screen.
+
+### Your own syntax
+
+Any `package:markdown` syntax can be added, and any element drawn your way:
+
+```dart
+StreamingMarkdown(
+  controller: controller,
+  syntax: MarkdownSyntax(inlineSyntaxes: [MentionSyntax()]),
+  elementBuilders: {
+    'mention': (context, element, isComplete) => Chip(label: Text('@${element.textContent}')),
+    'blockquote': (context, element, isComplete) => null, // null keeps the default
+  },
+)
+```
+
+A custom block syntax must not contain blank lines, because a block is
+finished at the first blank line while the reply streams.
+
+### Diagrams, SVG and the selection menu
+
+These are left to packages that do them well:
+
+```dart
+// Mermaid: draw the block once its closing fence is there
+codeBlockBuilder: (context, code, language, isComplete) {
+  if (language != 'mermaid') return null;
+  return isComplete ? MermaidView(code) : const Text('Drawing…');
+},
+
+// SVG images, with flutter_svg
+imageBuilder: (context, uri, alt) => uri.path.endsWith('.svg')
+    ? SvgPicture.network(uri.toString(), semanticsLabel: alt)
+    : Image.network(uri.toString(), semanticLabel: alt),
+```
+
+Copy, "Ask about this" and other selection menu items come from the
+`SelectionArea` around the chat: pass it a `contextMenuBuilder`.
 
 ### Styling
 
@@ -163,17 +278,25 @@ The default style takes the text style from `DefaultTextStyle` and the accent
 Cupertino apps set both from their theme. To set it yourself:
 
 ```dart
-StreamingMarkdown(
-  controller: controller,
-  style: StreamingMarkdownStyle.fromColors(
+StreamingMarkdownTheme(
+  style: StreamingMarkdownStyle.compact(
     textStyle: theme.textTheme.bodyMedium!,
     accentColor: theme.colorScheme.primary,
-  ).copyWith(blockSpacing: 16),
+  ).copyWith(blockPadding: {'h2': EdgeInsets.only(top: 8)}),
+  child: chat,
 )
 ```
 
-`healIncompleteMarkdown()` is exported too, in case you want the healing
-with a different renderer.
+`StreamingMarkdownTheme` styles every `StreamingMarkdown` below it; a
+widget's own `style` wins. Besides `fromColors` there are the `compact`,
+`spacious` and `terminal` presets. In a Material app the style can live in a
+`ThemeExtension` whose `lerp` calls `StreamingMarkdownStyle.lerp`.
+
+### Without widgets
+
+`package:llm_markdown/parser.dart` has the incremental parser,
+`healIncompleteMarkdown`, `markdownToPlainText` and `splitThinking`, and
+imports no Flutter, so it runs in a background isolate or in plain tests.
 
 ## Performance
 
@@ -198,15 +321,21 @@ of a heading, a closing code fence, ...). Those blocks are parsed once with
 parsed again whenever new text arrives, at most once per frame.
 
 The tests stream sample replies one character at a time, line by line and in
-random chunks, plus a few thousand generated documents, and check that every
-finished block matches a normal parse of the full text.
+random chunks, plus a few thousand generated documents and every example of
+the CommonMark and GitHub specs, and check that every finished block matches
+a normal parse of the full text. Golden images guard the look.
 
 ## Limitations
 
 - Once a footnote definition appears, the reply is parsed as a whole again
   (correct, just not incremental).
-- Raw HTML is shown as text.
+- Raw HTML is shown as text, apart from `<sub> <sup> <kbd> <mark> <u>
+  <ins> <small> <br>` and `<details>`.
 - Inline math has to fit on one line.
+- Mermaid, SVG and LaTeX layout come from other packages (see above).
+- `markdown` 7.3.1 crashes on a link definition ending in a backslash
+  (`[a]: /b\`); this package works around it, and shows the text as it is
+  if the parser ever throws.
 
 Tested on Flutter 3.35 and 3.50.
 

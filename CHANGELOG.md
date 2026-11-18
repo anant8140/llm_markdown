@@ -56,6 +56,12 @@
 * Style presets: `StreamingMarkdownStyle.compact`, `.spacious` and
   `.terminal`.
 * `StreamingMarkdownStyle.blockPadding` pads blocks by tag.
+* `package:llm_markdown/parser.dart`: the parser, healing and plain text
+  without Flutter, for background isolates.
+* A link definition ending in a backslash (`[a]: /b\`) no longer crashes
+  the `markdown` package; any other parser error shows the text as it is.
+* Every CommonMark and GitHub spec example is checked to stream exactly like
+  a one-shot parse; golden images guard the look.
 
 ## 0.2.0
 
