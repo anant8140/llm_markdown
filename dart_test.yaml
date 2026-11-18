@@ -1,3 +1,4 @@
 tags:
-  # pictures compared with test/goldens; made with the Flutter in .fvmrc
+  # pictures compared with test/goldens, made on macOS with the Flutter in
+  # .fvmrc; other systems draw a little differently
   golden:

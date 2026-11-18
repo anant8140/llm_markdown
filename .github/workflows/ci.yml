@@ -19,12 +19,26 @@ jobs:
       - run: flutter pub get
       - run: dart format --output=none --set-exit-if-changed .
       - run: flutter analyze
-      - run: flutter test
+      # pictures differ between systems; the golden job checks them
+      - run: flutter test --exclude-tags golden
       - name: Example
         working-directory: example
         run: |
           flutter pub get
           flutter analyze
+
+  golden:
+    name: Golden images (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.50.0
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test --tags golden
 
   minimum:
     name: Flutter 3.35 (minimum)
