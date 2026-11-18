@@ -1,5 +1,11 @@
 # llm_markdown
 
+[![pub](https://img.shields.io/pub/v/llm_markdown.svg)](https://pub.dev/packages/llm_markdown)
+[![points](https://img.shields.io/pub/points/llm_markdown)](https://pub.dev/packages/llm_markdown/score)
+[![likes](https://img.shields.io/pub/likes/llm_markdown)](https://pub.dev/packages/llm_markdown/score)
+[![CI](https://github.com/anant8140/llm_markdown/actions/workflows/ci.yml/badge.svg)](https://github.com/anant8140/llm_markdown/actions/workflows/ci.yml)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Markdown widget for chat apps that stream replies from an LLM.
 
 <img src="https://raw.githubusercontent.com/anant8140/llm_markdown/main/doc/demo.gif" width="320" alt="A reply streaming in: a thinking section, math, a code block and a checklist">
