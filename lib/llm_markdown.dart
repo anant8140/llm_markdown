@@ -26,6 +26,7 @@ export 'src/extras.dart'
     show CopyReplyButton, JumpToLatest, JumpToLatestBuilder, MarkdownShimmer;
 export 'src/headings.dart' show MarkdownHeading, MarkdownHeadings;
 export 'src/safety.dart' show defaultImageSchemes, defaultLinkSchemes;
+export 'src/mermaid/mermaid_view.dart' show MermaidDiagram;
 export 'src/renderer.dart'
     show
         MarkdownCodeBlockBuilder,

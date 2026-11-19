@@ -81,6 +81,7 @@ class StreamingMarkdown extends StatefulWidget {
     this.fadeOverflow = true,
     this.sliver = false,
     this.elementBuilders = const {},
+    this.diagrams = true,
     this.autoScrollController,
   }) : assert(maxLines == null || maxLines > 0, 'maxLines must be positive'),
        assert(!sliver || maxLines == null, 'a sliver has no maxLines'),
@@ -133,6 +134,7 @@ class StreamingMarkdown extends StatefulWidget {
     this.fadeOverflow = true,
     this.sliver = false,
     this.elementBuilders = const {},
+    this.diagrams = true,
     this.autoScrollController,
   }) : assert(maxLines == null || maxLines > 0, 'maxLines must be positive'),
        assert(!sliver || maxLines == null, 'a sliver has no maxLines'),
@@ -185,6 +187,7 @@ class StreamingMarkdown extends StatefulWidget {
     this.fadeOverflow = true,
     this.sliver = false,
     this.elementBuilders = const {},
+    this.diagrams = true,
     this.autoScrollController,
   }) : assert(maxLines == null || maxLines > 0, 'maxLines must be positive'),
        assert(!sliver || maxLines == null, 'a sliver has no maxLines'),
@@ -361,6 +364,11 @@ class StreamingMarkdown extends StatefulWidget {
   /// tags of `MarkdownSyntax.blockSyntaxes`, or `'blockquote'`. A builder
   /// that returns null keeps the default look.
   final Map<String, MarkdownElementBuilder> elementBuilders;
+
+  /// Whether a finished ` ```mermaid ` block is drawn as a diagram
+  /// (flowcharts, sequence diagrams and pie charts; see `MermaidDiagram`).
+  /// Other kinds stay code blocks. A `codeBlockBuilder` is asked first.
+  final bool diagrams;
 
   /// The scroll controller of the list that holds this widget.
   ///
@@ -688,6 +696,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
         widget.codeBlocks.collapseAfterLines !=
             _settings.codeBlocks.collapseAfterLines ||
         widget.searchQuery != _settings.searchQuery ||
+        widget.diagrams != _settings.diagrams ||
         !setEquals(
           widget.elementBuilders.keys.toSet(),
           _settings.elementBuilders.keys.toSet(),
@@ -711,6 +720,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       ..onCitationTap = widget.onCitationTap
       ..codeBlocks = widget.codeBlocks
       ..searchQuery = widget.searchQuery
+      ..diagrams = widget.diagrams
       ..elementBuilders = widget.elementBuilders
       ..searchColor = widget.searchHighlightColor
       ..zoomImages = widget.zoomImages

@@ -53,12 +53,13 @@ jobs:
           flutter-version: 3.35.0
           channel: stable
           cache: true
-      # material_ui needs Flutter 3.47+, it is only used by one test file
+      # material_ui needs Flutter 3.47+, it is only used by one test file;
+      # the example targets the latest Flutter only
       - run: |
           sed -i '/material_ui/d' pubspec.yaml
           rm test/design_library_test.dart
-      # the example targets the latest Flutter only
-      - run: flutter pub get --no-example
+          rm -r example
+      - run: flutter pub get
       - run: flutter analyze lib test
       # the pictures in test/goldens are made with the newer Flutter
       - run: flutter test --exclude-tags golden

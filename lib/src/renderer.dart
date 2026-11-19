@@ -10,6 +10,7 @@ import 'direction.dart';
 import 'fade.dart';
 import 'headings.dart';
 import 'icons.dart';
+import 'mermaid/mermaid_view.dart';
 import 'package:llm_markdown_parser/llm_markdown_parser.dart';
 import 'safety.dart';
 import 'thinking.dart';
@@ -102,6 +103,8 @@ class RenderSettings {
   bool zoomImages = true;
 
   String? searchQuery;
+
+  bool diagrams = true;
 
   Map<String, MarkdownElementBuilder> elementBuilders = const {};
 
@@ -1026,6 +1029,24 @@ class _Builder {
       isComplete,
     );
     if (custom != null) return custom;
+    // a finished mermaid block becomes a diagram; while it streams, and for
+    // kinds that aren't drawn, it stays code
+    if (settings.diagrams &&
+        isComplete &&
+        language == 'mermaid' &&
+        MermaidDiagram.supports(text)) {
+      return DiagramBlock(
+        source: text,
+        style: style,
+        code: CodeBlockView(
+          code: text,
+          language: language,
+          style: style,
+          highlight: false,
+          options: settings.codeBlocks,
+        ),
+      );
+    }
     return CodeBlockView(
       code: text,
       language: language,
@@ -1170,4 +1191,65 @@ class ImageViewer extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// A drawn diagram with a switch to its source.
+class DiagramBlock extends StatefulWidget {
+  const DiagramBlock({
+    super.key,
+    required this.source,
+    required this.style,
+    required this.code,
+  });
+
+  final String source;
+  final StreamingMarkdownStyle style;
+  final Widget code;
+
+  @override
+  State<DiagramBlock> createState() => _DiagramBlockState();
+}
+
+class _DiagramBlockState extends State<DiagramBlock> {
+  bool _showCode = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = widget.style;
+    final toggle = Semantics(
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => setState(() => _showCode = !_showCode),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Text(
+            _showCode ? 'Show diagram' : 'Show code',
+            style: style.codeBlockHeaderStyle,
+          ),
+        ),
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_showCode)
+          widget.code
+        else
+          DecoratedBox(
+            decoration: style.codeBlockDecoration,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Directionality(
+                // boxes and arrows keep their sides; labels find their own
+                textDirection: TextDirection.ltr,
+                child: MermaidDiagram(widget.source, style: style),
+              ),
+            ),
+          ),
+        Align(alignment: AlignmentDirectional.centerEnd, child: toggle),
+      ],
+    );
+  }
 }

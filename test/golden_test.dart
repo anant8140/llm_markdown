@@ -54,6 +54,34 @@ controller.append('Hello');
 - [ ] docs
 ''';
 
+const _diagrams = '''
+```mermaid
+flowchart TD
+  A[Question] --> B{Cached?}
+  B -->|yes| C(Answer)
+  B -->|no| D([Ask the model])
+  D --> E((Save))
+  E -.-> C
+```
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant A as App
+  U->>A: Send
+  A-->>U: Stream
+  Note right of A: heal and parse
+  A->>A: cache
+```
+
+```mermaid
+pie title Tokens
+"Prompt" : 30
+"Reply" : 55
+"Thinking" : 15
+```
+''';
+
 Widget _scene({
   required String text,
   bool dark = false,
@@ -92,9 +120,14 @@ void main() {
     goldenFileComparator = _Tolerant(local.basedir.resolve('golden_test.dart'));
   });
 
-  Future<void> shoot(WidgetTester tester, Widget scene, String name) async {
+  Future<void> shoot(
+    WidgetTester tester,
+    Widget scene,
+    String name, {
+    double height = 900,
+  }) async {
     tester.view
-      ..physicalSize = const Size(420, 900)
+      ..physicalSize = Size(420, height)
       ..devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(scene);
@@ -119,6 +152,10 @@ void main() {
       _scene(text: _reply, direction: TextDirection.rtl),
       'reply_rtl',
     );
+  });
+
+  testWidgets('diagrams', (tester) async {
+    await shoot(tester, _scene(text: _diagrams), 'diagrams', height: 1100);
   });
 
   testWidgets('half way through a stream', (tester) async {
