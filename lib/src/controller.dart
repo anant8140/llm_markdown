@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import 'plain_text.dart';
+import 'package:llm_markdown_parser/llm_markdown_parser.dart';
 
 /// Holds Markdown text that arrives in pieces, such as an AI chat reply.
 ///

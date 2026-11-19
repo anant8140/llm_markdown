@@ -19,10 +19,15 @@ environment:
   sdk: ^3.9.0
   flutter: ">=3.35.0"
 
+# the parser lives in this repository too
+workspace:
+  - packages/llm_markdown_parser
+
 dependencies:
   characters: ^1.4.0
   flutter:
     sdk: flutter
+  llm_markdown_parser: ^0.1.0
   markdown: ^7.3.1
   meta: ^1.15.0
   re_highlight: ^0.0.3

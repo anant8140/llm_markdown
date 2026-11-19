@@ -9,7 +9,7 @@ import 'package:llm_markdown/src/icons.dart';
 import 'package:llm_markdown/src/renderer.dart';
 import 'package:llm_markdown/src/smoothing.dart';
 
-import 'support/corpus.dart';
+import '../packages/llm_markdown_parser/test/support/corpus.dart';
 
 const Color _ink = Color(0xFF202124);
 

@@ -19,5 +19,10 @@ dependencies:
 dev_dependencies:
   flutter_lints: ^6.0.0
 
+# until the parser is on pub.dev, and to try changes to both together
+dependency_overrides:
+  llm_markdown_parser:
+    path: ../packages/llm_markdown_parser
+
 flutter:
   uses-material-design: true

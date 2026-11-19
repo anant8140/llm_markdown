@@ -154,6 +154,13 @@ packages:
       relative: true
     source: path
     version: "0.2.0"
+  llm_markdown_parser:
+    dependency: "direct overridden"
+    description:
+      path: "../packages/llm_markdown_parser"
+      relative: true
+    source: path
+    version: "0.1.0"
   markdown:
     dependency: transitive
     description:

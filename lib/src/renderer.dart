@@ -10,9 +10,8 @@ import 'direction.dart';
 import 'fade.dart';
 import 'headings.dart';
 import 'icons.dart';
-import 'math.dart';
+import 'package:llm_markdown_parser/llm_markdown_parser.dart';
 import 'safety.dart';
-import 'syntaxes.dart';
 import 'thinking.dart';
 import 'style.dart';
 

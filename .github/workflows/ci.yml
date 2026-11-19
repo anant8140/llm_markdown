@@ -21,6 +21,9 @@ jobs:
       - run: flutter analyze
       # pictures differ between systems; the golden job checks them
       - run: flutter test --exclude-tags golden
+      - name: Parser package (pure Dart)
+        working-directory: packages/llm_markdown_parser
+        run: dart test
       - name: Example
         working-directory: example
         run: |
@@ -59,3 +62,6 @@ jobs:
       - run: flutter analyze lib test
       # the pictures in test/goldens are made with the newer Flutter
       - run: flutter test --exclude-tags golden
+      - name: Parser package (pure Dart)
+        working-directory: packages/llm_markdown_parser
+        run: dart test

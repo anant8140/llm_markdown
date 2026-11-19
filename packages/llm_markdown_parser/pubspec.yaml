@@ -1,0 +1,26 @@
+name: llm_markdown_parser
+description: >-
+  Pure Dart Markdown for streaming LLM replies: incremental parsing, healing
+  of half-typed syntax, plain text, think tags and server-sent events.
+version: 0.1.0
+repository: https://github.com/anant8140/llm_markdown/tree/main/packages/llm_markdown_parser
+issue_tracker: https://github.com/anant8140/llm_markdown/issues
+topics:
+  - markdown
+  - ai
+  - streaming
+  - llm
+  - parser
+
+environment:
+  sdk: ^3.9.0
+
+resolution: workspace
+
+dependencies:
+  markdown: ^7.3.1
+  meta: ^1.15.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.0

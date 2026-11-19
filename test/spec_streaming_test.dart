@@ -8,8 +8,7 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:llm_markdown/llm_markdown.dart';
-import 'package:llm_markdown/src/incremental_parser.dart';
-import 'package:llm_markdown/src/math.dart';
+import 'package:llm_markdown_parser/llm_markdown_parser.dart';
 import 'package:markdown/markdown.dart' as md;
 
 Directory? _specs() {

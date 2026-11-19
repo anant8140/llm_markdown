@@ -5,7 +5,7 @@ import 'package:flutter/widgets.dart';
 
 import 'controller.dart';
 import 'icons.dart';
-import 'plain_text.dart';
+import 'package:llm_markdown_parser/llm_markdown_parser.dart';
 import 'style.dart';
 
 /// Grey lines that shimmer while the first words of a reply are on the way.

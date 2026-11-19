@@ -1,5 +1,5 @@
-import 'package:flutter_test/flutter_test.dart';
-import 'package:llm_markdown/llm_markdown.dart';
+import 'package:test/test.dart';
+import 'package:llm_markdown_parser/llm_markdown_parser.dart';
 
 void main() {
   const cases = <String, String>{

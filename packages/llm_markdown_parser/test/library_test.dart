@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
-import 'package:llm_markdown/parser.dart';
+import 'package:llm_markdown_parser/llm_markdown_parser.dart';
+import 'package:test/test.dart';
 
 // every file the parser library reaches, through imports and exports
 Set<String> _reached(String start) {
@@ -25,10 +25,16 @@ Set<String> _reached(String start) {
 }
 
 void main() {
-  test('package:llm_markdown/parser.dart imports no Flutter', () {
-    final reached = _reached(File('lib/parser.dart').absolute.path);
+  test('nothing in the package imports Flutter', () {
+    final reached = _reached(
+      File('lib/llm_markdown_parser.dart').absolute.path,
+    );
     expect(reached.where((uri) => uri.contains('package:flutter')), isEmpty);
     expect(reached, contains('package:markdown/markdown.dart'));
+  });
+
+  test('the package does not need the Flutter SDK', () {
+    expect(File('pubspec.yaml').readAsStringSync(), isNot(contains('flutter')));
   });
 
   test('it parses a streamed reply', () {

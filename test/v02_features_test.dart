@@ -1,8 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:llm_markdown/llm_markdown.dart';
-import 'package:llm_markdown/src/math.dart';
-import 'package:llm_markdown/src/thinking.dart';
+import 'package:llm_markdown_parser/llm_markdown_parser.dart';
 import 'package:markdown/markdown.dart' as md;
 
 Widget _host(Widget child) => WidgetsApp(

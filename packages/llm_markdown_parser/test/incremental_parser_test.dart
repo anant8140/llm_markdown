@@ -1,8 +1,7 @@
 import 'dart:math';
 
-import 'package:flutter_test/flutter_test.dart';
-import 'package:llm_markdown/src/incremental_parser.dart';
-import 'package:llm_markdown/src/math.dart';
+import 'package:test/test.dart';
+import 'package:llm_markdown_parser/llm_markdown_parser.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import 'support/corpus.dart';

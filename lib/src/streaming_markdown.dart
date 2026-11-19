@@ -11,12 +11,11 @@ import 'controller.dart';
 import 'direction.dart';
 import 'headings.dart';
 import 'line_clip.dart';
-import 'incremental_parser.dart';
+import 'package:llm_markdown_parser/llm_markdown_parser.dart';
 import 'renderer.dart';
 import 'safety.dart';
 import 'smoothing.dart';
 import 'style.dart';
-import 'syntaxes.dart';
 import 'thinking.dart';
 
 /// Shows Markdown that arrives in pieces, such as an AI chat reply, without

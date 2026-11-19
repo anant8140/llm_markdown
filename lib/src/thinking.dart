@@ -4,8 +4,6 @@ import 'package:flutter/widgets.dart';
 
 import 'icons.dart';
 
-export 'thinking_split.dart';
-
 /// Returns the title of the thinking section.
 ///
 /// [duration] is how long the model thought, or null while it is still

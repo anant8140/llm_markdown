@@ -5,8 +5,16 @@
 /// and [Smoothing] reveals bursts at a steady pace.
 library;
 
-export 'src/adapters.dart'
-    show ModelStreamError, ModelStreams, ServerSentEvent, serverSentEvents;
+export 'package:llm_markdown_parser/llm_markdown_parser.dart'
+    show
+        MarkdownSyntax,
+        ModelStreamError,
+        ServerSentEvent,
+        healIncompleteMarkdown,
+        markdownToPlainText,
+        serverSentEvents;
+
+export 'src/adapters.dart' show ModelStreams;
 export 'src/code_options.dart'
     show
         CodeActionsBuilder,
@@ -17,8 +25,6 @@ export 'src/controller.dart' show StreamingMarkdownController;
 export 'src/extras.dart'
     show CopyReplyButton, JumpToLatest, JumpToLatestBuilder, MarkdownShimmer;
 export 'src/headings.dart' show MarkdownHeading, MarkdownHeadings;
-export 'src/healer.dart' show healIncompleteMarkdown;
-export 'src/plain_text.dart' show markdownToPlainText;
 export 'src/safety.dart' show defaultImageSchemes, defaultLinkSchemes;
 export 'src/renderer.dart'
     show
@@ -31,5 +37,4 @@ export 'src/renderer.dart'
 export 'src/smoothing.dart' show RevealUnit, Smoothing;
 export 'src/streaming_markdown.dart' show StreamingMarkdown;
 export 'src/style.dart' show StreamingMarkdownStyle, StreamingMarkdownTheme;
-export 'src/syntaxes.dart' show MarkdownSyntax;
 export 'src/thinking.dart' show ThinkingLabelBuilder;
