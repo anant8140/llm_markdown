@@ -1,5 +1,6 @@
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:llm_markdown/llm_markdown.dart';
 import 'package:llm_markdown/src/headings.dart';
@@ -179,6 +180,43 @@ void main() {
       await tester.tap(find.byType(InteractiveViewer));
       await tester.pumpAndSettle();
       expect(find.byType(InteractiveViewer), findsNothing);
+    });
+
+    testWidgets('SVG pictures are drawn, from an address or inline', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app(
+          const StreamingMarkdown.text(
+            '![Logo](https://example.com/logo.SVG?size=2)\n\n'
+            '![Photo](https://example.com/photo.png)',
+          ),
+        ),
+      );
+      expect(find.byType(SvgPicture), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
+
+      final inline = Uri.dataFromString(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20">'
+        '<rect width="40" height="20" fill="#f00"/></svg>',
+        mimeType: 'image/svg+xml',
+      );
+      await tester.pumpWidget(
+        _app(
+          StreamingMarkdown.text(
+            '![Red box]($inline)',
+            allowedImageSchemes: const {'https', 'data'},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(tester.getSize(find.byType(SvgPicture)), const Size(40, 20));
+      // not allowed by default: the alt text shows
+      await tester.pumpWidget(
+        _app(StreamingMarkdown.text('![Red box]($inline)')),
+      );
+      expect(find.byType(SvgPicture), findsNothing);
     });
 
     testWidgets('zoomImages: false leaves them alone', (tester) async {

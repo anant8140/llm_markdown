@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import 'code_block.dart';
@@ -902,6 +903,33 @@ class _Builder {
     Widget build(BuildContext context) {
       final builder = settings.imageBuilder;
       if (builder != null) return builder(context, uri, alt);
+      Widget failed(BuildContext context, Object error, StackTrace? stack) =>
+          Text(alt ?? '', style: style.textStyle);
+      // data: images only get here when the app allowed that scheme
+      final data = uri.scheme == 'data' ? uri.data : null;
+      final svg = data != null
+          ? data.mimeType == 'image/svg+xml'
+          : uri.path.toLowerCase().endsWith('.svg');
+      if (svg) {
+        return data != null
+            ? SvgPicture.memory(
+                data.contentAsBytes(),
+                semanticsLabel: alt,
+                errorBuilder: failed,
+              )
+            : SvgPicture.network(
+                uri.toString(),
+                semanticsLabel: alt,
+                errorBuilder: failed,
+              );
+      }
+      if (data != null) {
+        return Image.memory(
+          data.contentAsBytes(),
+          semanticLabel: alt,
+          errorBuilder: failed,
+        );
+      }
       return Image.network(
         uri.toString(),
         semanticLabel: alt,
