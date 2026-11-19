@@ -1,4 +1,4 @@
-## Unreleased
+## 0.3.0
 
 * Screen readers skip text that is still arriving and announce the reply
   when it is done (`announceWhenDone`).

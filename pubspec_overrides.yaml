@@ -1,0 +1,6 @@
+# The parser lives in this repository too; work on both together.
+# Not published (see .pubignore): on pub.dev llm_markdown uses the released
+# llm_markdown_parser.
+dependency_overrides:
+  llm_markdown_parser:
+    path: packages/llm_markdown_parser

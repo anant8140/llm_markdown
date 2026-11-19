@@ -23,7 +23,10 @@ jobs:
       - run: flutter test --exclude-tags golden
       - name: Parser package (pure Dart)
         working-directory: packages/llm_markdown_parser
-        run: dart test
+        run: |
+          dart pub get
+          dart analyze
+          dart test
       - name: Example
         working-directory: example
         run: |
@@ -66,4 +69,7 @@ jobs:
       - run: flutter test --exclude-tags golden
       - name: Parser package (pure Dart)
         working-directory: packages/llm_markdown_parser
-        run: dart test
+        run: |
+          dart pub get
+          dart analyze
+          dart test

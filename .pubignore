@@ -1,2 +1,4 @@
-# published on its own
+# published on its own, with tool/publish_parser.sh
 packages/
+pubspec_overrides.yaml
+tool/
