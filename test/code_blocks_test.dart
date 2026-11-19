@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -203,6 +205,28 @@ void main() {
     }
     expect(colored, greaterThanOrEqualTo(1));
     expect(_codeText(tester), contains('final b'));
+  });
+
+  test('code uses the JetBrains Mono that comes with the package', () {
+    final style = StreamingMarkdownStyle.fromColors(
+      textStyle: const TextStyle(color: Color(0xFF202124)),
+      accentColor: const Color(0xFF1A73E8),
+    );
+    const family = 'packages/llm_markdown/JetBrainsMono';
+    expect(style.codeBlockTextStyle.fontFamily, family);
+    expect(style.inlineCodeStyle.fontFamily, family);
+    expect(style.codeBlockTextStyle.fontFamilyFallback, contains('Menlo'));
+
+    // declared for apps, with its license next to it
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    expect(pubspec, contains('family: JetBrainsMono'));
+    expect(pubspec, contains('asset: fonts/JetBrainsMono-Regular.ttf'));
+    final font = File('fonts/JetBrainsMono-Regular.ttf').readAsBytesSync();
+    expect(font.sublist(0, 4), [0, 1, 0, 0], reason: 'a TrueType file');
+    expect(
+      File('fonts/OFL.txt').readAsStringSync(),
+      contains('SIL OPEN FONT LICENSE Version 1.1'),
+    );
   });
 
   test('code themes and a custom monospace font', () {

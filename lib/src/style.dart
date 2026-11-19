@@ -77,9 +77,8 @@ class StreamingMarkdownStyle {
   /// any background. [brightness] chooses the code highlighting colors; it
   /// is worked out from the text color when not given.
   ///
-  /// [monospace] sets the font for code, e.g.
-  /// `GoogleFonts.jetBrainsMono()`. On the web there is no built-in
-  /// monospace font, so passing one there is a good idea.
+  /// [monospace] sets the font for code; it defaults to [codeFont], the
+  /// JetBrains Mono that comes with this package.
   factory StreamingMarkdownStyle.fromColors({
     required TextStyle textStyle,
     required Color accentColor,
@@ -98,13 +97,10 @@ class StreamingMarkdownStyle {
     final body = textStyle.copyWith(color: text, height: 1.5);
     final fontSize = body.fontSize ?? 14;
     Color tint(double alpha) => text.withValues(alpha: alpha);
-    final mono =
-        (monospace ??
-                const TextStyle(
-                  fontFamily: 'monospace',
-                  fontFamilyFallback: _monospaceFallback,
-                ))
-            .copyWith(fontSize: fontSize * 0.9, color: text);
+    final mono = (monospace ?? codeFont).copyWith(
+      fontSize: fontSize * 0.9,
+      color: text,
+    );
     TextStyle heading(double scale, FontWeight weight) => body.copyWith(
       fontSize: fontSize * scale,
       fontWeight: weight,
@@ -183,12 +179,7 @@ class StreamingMarkdownStyle {
     Brightness? brightness,
     TextStyle? monospace,
   }) {
-    final mono =
-        monospace ??
-        const TextStyle(
-          fontFamily: 'monospace',
-          fontFamilyFallback: _monospaceFallback,
-        );
+    final mono = monospace ?? codeFont;
     final base = StreamingMarkdownStyle.fromColors(
       textStyle: textStyle.merge(mono),
       accentColor: accentColor,
@@ -232,6 +223,16 @@ class StreamingMarkdownStyle {
       accentColor: accent,
     );
   }
+
+  /// JetBrains Mono, which comes with this package, so code looks the same
+  /// on every platform, the web included. System monospace fonts are the
+  /// fallback.
+  static const TextStyle codeFont = TextStyle(
+    // written out, because TextStyle's `package` would also put the prefix
+    // on the system fonts in the fallback list
+    fontFamily: 'packages/llm_markdown/JetBrainsMono',
+    fontFamilyFallback: _monospaceFallback,
+  );
 
   /// The style of paragraph text.
   final TextStyle textStyle;

@@ -18,6 +18,8 @@ dependencies:
 
 dev_dependencies:
   flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
 
 # until the parser is on pub.dev, and to try changes to both together
 dependency_overrides:

@@ -38,3 +38,10 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   material_ui: ^1.11.1
+
+flutter:
+  # the code font; fonts/OFL.txt is its license
+  fonts:
+    - family: JetBrainsMono
+      fonts:
+        - asset: fonts/JetBrainsMono-Regular.ttf

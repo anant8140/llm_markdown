@@ -251,7 +251,10 @@ void main() {
       expect(compact.blockSpacing, lessThan(normal.blockSpacing));
       expect(spacious.blockSpacing, greaterThan(normal.blockSpacing));
       expect(compact.textStyle.height, lessThan(spacious.textStyle.height!));
-      expect(terminal.textStyle.fontFamily, 'monospace');
+      expect(
+        terminal.textStyle.fontFamily,
+        'packages/llm_markdown/JetBrainsMono',
+      );
       expect(terminal.headingStyles.map((h) => h.fontSize).toSet(), {
         terminal.textStyle.fontSize,
       });
