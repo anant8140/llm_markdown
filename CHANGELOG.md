@@ -1,4 +1,4 @@
-## Unreleased
+## 0.4.0
 
 * Following the end of a reply (`autoScrollController`) no longer stops
   half way on iOS and macOS. It was lost whenever the reply got a little
