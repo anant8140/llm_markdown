@@ -94,6 +94,10 @@ class _ChatScreenState extends State<ChatScreen> {
     _reply.complete();
   }
 
+  void _say(String message) => ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(message)));
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
@@ -113,45 +117,77 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
-      // Lets the user select and copy text across the whole chat.
-      body: SelectionArea(
-        child: ListView(
-          controller: _scroll,
-          padding: const EdgeInsets.all(16),
+      // Makes the whole chat selectable, with an extra button in the menu.
+      body: MarkdownSelectionArea(
+        actions: [
+          MarkdownSelectionAction(
+            label: 'Ask about this',
+            onSelected: (text) => _say('Ask about "$text"'),
+          ),
+        ],
+        child: Stack(
           children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
+            ListView(
+              controller: _scroll,
+              padding: const EdgeInsets.all(16),
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colors.primaryContainer,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Text(
+                      'How do I show streaming Markdown in Flutter?',
+                    ),
+                  ),
                 ),
-                decoration: BoxDecoration(
-                  color: colors.primaryContainer,
-                  borderRadius: BorderRadius.circular(16),
+                const SizedBox(height: 16),
+                StreamingMarkdown(
+                  controller: _reply,
+                  smoothing: _smooth
+                      ? const Smoothing.adaptive()
+                      : const Smoothing.none(),
+                  autoScrollController: _scroll,
+                  codeBlocks: const CodeBlockOptions(
+                    lineNumbers: true,
+                    highlightWhileStreaming: true,
+                  ),
+                  // the little picture in the reply is an inline SVG
+                  allowedImageSchemes: const {'https', 'data'},
+                  mathBuilder: (context, tex, display) => Math.tex(
+                    tex,
+                    mathStyle: display ? MathStyle.display : MathStyle.text,
+                    onErrorFallback: (error) => Text(tex),
+                  ),
+                  onLinkTap: (url) => _say('Open $url'),
+                  onCitationTap: (number) => _say('Source $number'),
                 ),
-                child: const Text(
-                  'How do I show streaming Markdown in Flutter?',
+                const SizedBox(height: 80),
+              ],
+            ),
+            // shows once the user scrolls up while the reply still grows
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 88,
+              child: Center(
+                child: JumpToLatest(
+                  controller: _scroll,
+                  content: _reply,
+                  builder: (context, jump) => FilledButton.tonalIcon(
+                    onPressed: jump,
+                    icon: const Icon(Icons.arrow_downward),
+                    label: const Text('Latest'),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            StreamingMarkdown(
-              controller: _reply,
-              smoothing: _smooth
-                  ? const Smoothing.adaptive()
-                  : const Smoothing.none(),
-              autoScrollController: _scroll,
-              mathBuilder: (context, tex, display) => Math.tex(
-                tex,
-                mathStyle: display ? MathStyle.display : MathStyle.text,
-                onErrorFallback: (error) => Text(tex),
-              ),
-              onLinkTap: (url) =>
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(SnackBar(content: Text('Open $url'))),
-            ),
-            const SizedBox(height: 80),
           ],
         ),
       ),
@@ -174,7 +210,11 @@ a short example.
 ## Streaming Markdown in Flutter
 
 Use **llm_markdown**. It parses only the *new* text, so long replies stay
-smooth, and it tidies unfinished syntax such as `**bold` while it streams.
+smooth, and it ==tidies unfinished syntax== such as `**bold` while it
+streams [1][2].
+
+> [!TIP]
+> Keep one controller per message, so a reply survives scrolling.
 
 ### Steps
 
@@ -189,6 +229,17 @@ await for (final chunk in model.generate(prompt)) {
   controller.append(chunk);
 }
 controller.complete();
+```
+
+### How a chunk travels
+
+```mermaid
+flowchart TD
+  A[New chunk] --> B{Block finished?}
+  B -->|yes| C(Parse once, keep)
+  B -->|no| D([Heal and parse again])
+  C --> E((Show))
+  D --> E
 ```
 
 ### A bit of math
@@ -206,11 +257,11 @@ $$
 | Re-render everything | whole reply | yes |
 | **llm_markdown** | last block only | no |
 
-> Finished blocks are built **once** and never parsed again.
-
 - [x] Code blocks with a copy button
-- [x] Tables, quotes and task lists
+- [x] Diagrams, tables and task lists
 - [ ] Your next feature
+
+![A drawn SVG picture](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMjAiIGhlaWdodD0iNTYiIHZpZXdCb3g9IjAgMCAyMjAgNTYiPjxyZWN0IHdpZHRoPSIyMjAiIGhlaWdodD0iNTYiIHJ4PSIxMiIgZmlsbD0iIzNGNTFCNSIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMjgiIHI9IjEyIiBmaWxsPSIjRkZDMTA3Ii8+PHJlY3QgeD0iNTQiIHk9IjE4IiB3aWR0aD0iMTQwIiBoZWlnaHQ9IjgiIHJ4PSI0IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iNTQiIHk9IjMyIiB3aWR0aD0iOTYiIGhlaWdodD0iOCIgcng9IjQiIGZpbGw9IiNDNUNBRTkiLz48L3N2Zz4=)
 
 Read more in the [Flutter docs](https://docs.flutter.dev). ગુજરાતી અને emoji 🚀 પણ ચાલે છે.
 ''';

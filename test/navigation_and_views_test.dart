@@ -244,6 +244,30 @@ void main() {
       expect(find.byType(SvgImage), findsNothing);
     });
 
+    testWidgets('a drawn SVG opens to zoom when tapped', (tester) async {
+      // anywhere on the picture counts, also a see-through part of it
+      final svg = Uri.dataFromString(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60">'
+        '<circle cx="20" cy="20" r="10" fill="#f00"/></svg>',
+        mimeType: 'image/svg+xml',
+      );
+      await tester.pumpWidget(
+        _app(
+          StreamingMarkdown.text(
+            '![Logo]($svg)',
+            allowedImageSchemes: const {'https', 'data'},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // an empty corner of the picture
+      await tester.tapAt(
+        tester.getBottomRight(find.byType(SvgPicture)) - const Offset(4, 4),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(InteractiveViewer), findsOneWidget);
+    });
+
     testWidgets('zoomImages: false leaves them alone', (tester) async {
       await tester.pumpWidget(
         _app(

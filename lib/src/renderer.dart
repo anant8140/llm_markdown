@@ -960,7 +960,13 @@ class _Builder {
     return Semantics(
       button: true,
       onTapHint: 'zoom',
-      child: GestureDetector(onTap: tap, child: build(context)),
+      child: GestureDetector(
+        // the whole picture takes the tap: a drawn SVG, unlike a photo,
+        // doesn't take taps itself
+        behavior: HitTestBehavior.opaque,
+        onTap: tap,
+        child: build(context),
+      ),
     );
   }
 

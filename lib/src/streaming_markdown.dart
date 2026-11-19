@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
@@ -670,7 +671,11 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     if (scroll == null || !scroll.hasClients || _followScheduled) return;
     final position = scroll.position;
     if (!position.hasContentDimensions) return;
-    if (position.isScrollingNotifier.value) return;
+    // Only the user's own drag or fling stops the following. The list also
+    // "scrolls" when it springs back after the reply got shorter for a
+    // frame (a half-typed image is hidden, a formula's source becomes the
+    // drawn formula); giving up then would lose the end for good.
+    if (position.userScrollDirection != ScrollDirection.idle) return;
     if (position.pixels < position.maxScrollExtent - 48) return;
     _followScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1000,6 +1005,17 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
           ],
         ).createShader(bounds),
         child: column,
+      );
+    }
+    if (widget.autoScrollController != null) {
+      // A picture that loads late makes the reply taller without any new
+      // text; keep following then too.
+      column = NotificationListener<SizeChangedLayoutNotification>(
+        onNotification: (notification) {
+          _followEnd();
+          return true;
+        },
+        child: SizeChangedLayoutNotifier(child: column),
       );
     }
     if (!widget.tapToSkip) return column;

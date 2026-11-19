@@ -8,7 +8,7 @@
 
 Markdown widget for chat apps that stream replies from an LLM.
 
-<img src="https://raw.githubusercontent.com/anant8140/llm_markdown/main/doc/demo.gif" width="320" alt="A reply streaming in: a thinking section, math, a code block and a checklist">
+<img src="https://raw.githubusercontent.com/anant8140/llm_markdown/main/doc/demo.gif" width="320" alt="A reply streaming in: a thinking section, an alert, a code block, a drawn diagram, math, a table and a checklist">
 
 If you render a streaming reply with a regular Markdown widget, the whole
 text is parsed again on every chunk. That gets slow on long answers, you see

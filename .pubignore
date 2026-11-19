@@ -38,3 +38,8 @@ migrate_working_dir/
 
 # FVM Version Cache
 .fvm/
+
+# made on demand with `flutter create --platforms=ios .` in example/
+/example/ios/
+/example/android/
+/example/macos/

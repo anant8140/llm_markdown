@@ -121,10 +121,15 @@ class _ScenePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.scale(scale);
+    // its own layer, so an edge label can erase the bit of line under it
+    // without erasing what is behind the diagram
+    canvas
+      ..saveLayer(Offset.zero & size, Paint())
+      ..scale(scale);
     for (final op in scene.ops) {
       op(canvas);
     }
+    canvas.restore();
   }
 
   @override
@@ -395,6 +400,7 @@ class _SceneBuilder {
 
     // room for edge labels drawn beside the lines
     var extra = 0.0;
+    final edgeLabels = <(TextPainter, Offset)>[];
     final edgePaint = stroke(line);
     for (var i = 0; i < edges.length; i++) {
       final edge = edges[i].$3;
@@ -473,18 +479,27 @@ class _SceneBuilder {
           ),
           maxWidth: 140,
         );
-        // beside the middle of the edge's middle stretch
+        // on the middle of the edge's middle stretch, as Mermaid does
         final k = stops.length ~/ 2;
-        final middle =
+        final center =
             (point(stops[k - 1].$1, stops[k - 1].$2) +
                 point(stops[k].$1, stops[k].$2)) /
             2;
-        final center = horizontal
-            ? middle - Offset(0, painter.height / 2 + 4)
-            : middle + Offset(painter.width / 2 + 6, 0);
         extra = math.max(extra, center.dx + painter.width / 2);
-        drawText(painter, center);
+        edgeLabels.add((painter, center));
       }
+    }
+    // after every edge, so no later edge is drawn across a label: the line
+    // under each label is erased, then the label is written in the gap
+    final erase = Paint()..blendMode = BlendMode.clear;
+    for (final (painter, center) in edgeLabels) {
+      final gap = Rect.fromCenter(
+        center: center,
+        width: painter.width + 8,
+        height: painter.height + 2,
+      );
+      ops.add((canvas) => canvas.drawRect(gap, erase));
+      drawText(painter, center);
     }
 
     for (var i = 0; i < nodes.length; i++) {

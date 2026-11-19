@@ -1,3 +1,16 @@
+## Unreleased
+
+* Following the end of a reply (`autoScrollController`) no longer stops
+  half way on iOS and macOS. It was lost whenever the reply got a little
+  shorter for one frame, for example when a half-typed image was hidden or
+  a formula's source became the drawn formula.
+* The end is also followed when a picture loads late and makes the reply
+  taller without any new text.
+* Labels on Mermaid flowchart edges sit in a gap of the line, not on top of
+  it.
+* A tap anywhere on a drawn SVG opens it, also on a see-through part.
+* The example app shows the 0.3.0 features, and the demo GIF is new.
+
 ## 0.3.0
 
 * Screen readers skip text that is still arriving and announce the reply

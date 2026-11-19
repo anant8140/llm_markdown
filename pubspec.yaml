@@ -6,7 +6,7 @@ version: 0.3.0
 repository: https://github.com/anant8140/llm_markdown
 issue_tracker: https://github.com/anant8140/llm_markdown/issues
 screenshots:
-  - description: A reply streaming into the widget
+  - description: A reply streaming in, with a code block, a drawn diagram, math and a table
     path: doc/demo.gif
 topics:
   - markdown
