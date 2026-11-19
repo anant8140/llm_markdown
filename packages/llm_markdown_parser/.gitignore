@@ -1,0 +1,3 @@
+# a library does not ship its lock file
+pubspec.lock
+.dart_tool/
