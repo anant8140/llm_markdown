@@ -11,6 +11,7 @@ import 'code_options.dart';
 import 'controller.dart';
 import 'direction.dart';
 import 'headings.dart';
+import 'labels.dart';
 import 'line_clip.dart';
 import 'package:llm_markdown_parser/llm_markdown_parser.dart';
 import 'renderer.dart';
@@ -83,6 +84,9 @@ class StreamingMarkdown extends StatefulWidget {
     this.sliver = false,
     this.elementBuilders = const {},
     this.diagrams = true,
+    this.labels,
+    this.thinkingBuilder,
+    this.cursorBuilder,
     this.autoScrollController,
   }) : assert(maxLines == null || maxLines > 0, 'maxLines must be positive'),
        assert(!sliver || maxLines == null, 'a sliver has no maxLines'),
@@ -136,6 +140,9 @@ class StreamingMarkdown extends StatefulWidget {
     this.sliver = false,
     this.elementBuilders = const {},
     this.diagrams = true,
+    this.labels,
+    this.thinkingBuilder,
+    this.cursorBuilder,
     this.autoScrollController,
   }) : assert(maxLines == null || maxLines > 0, 'maxLines must be positive'),
        assert(!sliver || maxLines == null, 'a sliver has no maxLines'),
@@ -189,6 +196,9 @@ class StreamingMarkdown extends StatefulWidget {
     this.sliver = false,
     this.elementBuilders = const {},
     this.diagrams = true,
+    this.labels,
+    this.thinkingBuilder,
+    this.cursorBuilder,
     this.autoScrollController,
   }) : assert(maxLines == null || maxLines > 0, 'maxLines must be positive'),
        assert(!sliver || maxLines == null, 'a sliver has no maxLines'),
@@ -370,6 +380,19 @@ class StreamingMarkdown extends StatefulWidget {
   /// (flowcharts, sequence diagrams and pie charts; see `MermaidDiagram`).
   /// Other kinds stay code blocks. A `codeBlockBuilder` is asked first.
   final bool diagrams;
+
+  /// The text the widget shows or reads out by itself ("Copy", "Show
+  /// code", alert titles, ...), for other languages. Defaults to the
+  /// nearest `StreamingMarkdownTheme.labels`, or English.
+  final MarkdownLabels? labels;
+
+  /// Builds the thinking section yourself, in place of the built-in
+  /// collapsible one.
+  final MarkdownThinkingBuilder? thinkingBuilder;
+
+  /// Builds the cursor shown while text arrives, in place of the built-in
+  /// one ([cursorStyle] is then not used).
+  final MarkdownCursorBuilder? cursorBuilder;
 
   /// The scroll controller of the list that holds this widget.
   ///
@@ -689,8 +712,10 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     });
   }
 
-  void _updateSettings(StreamingMarkdownStyle style) {
+  void _updateSettings(StreamingMarkdownStyle style, MarkdownLabels labels) {
     final changed =
+        labels != _settings.labels ||
+        (widget.cursorBuilder == null) != (_settings.cursorBuilder == null) ||
         style != _settings.style ||
         widget.highlightCode != _settings.highlightCode ||
         widget.newlinesAsBreaks != _settings.newlinesAsBreaks ||
@@ -726,6 +751,8 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       ..codeBlocks = widget.codeBlocks
       ..searchQuery = widget.searchQuery
       ..diagrams = widget.diagrams
+      ..labels = labels
+      ..cursorBuilder = widget.cursorBuilder
       ..elementBuilders = widget.elementBuilders
       ..searchColor = widget.searchHighlightColor
       ..zoomImages = widget.zoomImages
@@ -865,7 +892,12 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
   @override
   Widget build(BuildContext context) {
     final style = widget.style ?? StreamingMarkdownStyle.of(context);
-    _updateSettings(style);
+    _updateSettings(
+      style,
+      widget.labels ??
+          StreamingMarkdownTheme.labelsOf(context) ??
+          const MarkdownLabels(),
+    );
 
     final text = _controller.text;
     final visible = _shown >= text.length ? text : text.substring(0, _shown);
@@ -910,11 +942,13 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
         children.add(
           Align(
             alignment: AlignmentDirectional.centerStart,
-            child: StreamingCursor(
-              color: style.accentColor,
-              fontSize: style.textStyle.fontSize ?? 14,
-              style: widget.cursorStyle,
-            ),
+            child:
+                widget.cursorBuilder?.call(context, style.textStyle) ??
+                StreamingCursor(
+                  color: style.accentColor,
+                  fontSize: style.textStyle.fontSize ?? 14,
+                  style: widget.cursorStyle,
+                ),
           ),
         );
       }
@@ -932,19 +966,35 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
         streaming: !split.done,
         countBuilds: false,
       );
+      final label = (widget.thinkingLabel ?? defaultThinkingLabel)(
+        split.done,
+        split.done ? _thinkingTook : null,
+      );
+      final thoughts = _spaced(thought.widgets, style.blockSpacing);
+      final thinkingBuilder = widget.thinkingBuilder;
       children.insert(
         0,
-        ThinkingSection(
-          label: (widget.thinkingLabel ?? defaultThinkingLabel)(
-            split.done,
-            split.done ? _thinkingTook : null,
-          ),
-          done: split.done,
-          color: style.codeBlockHeaderStyle.color ?? style.accentColor,
-          textStyle: style.textStyle,
-          initiallyExpanded: widget.thinkingInitiallyExpanded,
-          child: _spaced(thought.widgets, style.blockSpacing),
-        ),
+        thinkingBuilder != null
+            ? thinkingBuilder(
+                context,
+                MarkdownThinking(
+                  done: split.done,
+                  duration: split.done ? _thinkingTook : null,
+                  label: label,
+                  content: thoughts,
+                ),
+              )
+            : ThinkingSection(
+                label: label,
+                done: split.done,
+                color:
+                    style.thinkingStyle?.color ??
+                    style.codeBlockHeaderStyle.color ??
+                    style.accentColor,
+                textStyle: style.textStyle.merge(style.thinkingStyle),
+                initiallyExpanded: widget.thinkingInitiallyExpanded,
+                child: thoughts,
+              ),
       );
     }
 

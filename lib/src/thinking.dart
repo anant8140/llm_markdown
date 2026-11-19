@@ -11,6 +11,37 @@ import 'icons.dart';
 typedef ThinkingLabelBuilder =
     String Function(bool thinkingDone, Duration? duration);
 
+/// What a custom thinking section is built from.
+@immutable
+class MarkdownThinking {
+  /// Creates the description of a thinking section.
+  const MarkdownThinking({
+    required this.done,
+    required this.duration,
+    required this.label,
+    required this.content,
+  });
+
+  /// Whether the model has finished thinking.
+  final bool done;
+
+  /// How long it thought, or null while it still thinks or when the time
+  /// isn't known (a reply loaded from history).
+  final Duration? duration;
+
+  /// The title the built-in section would show, from
+  /// `StreamingMarkdown.thinkingLabel`.
+  final String label;
+
+  /// The thoughts, rendered as Markdown and still streaming while [done]
+  /// is false.
+  final Widget content;
+}
+
+/// Builds the thinking section, in place of the built-in collapsible one.
+typedef MarkdownThinkingBuilder =
+    Widget Function(BuildContext context, MarkdownThinking thinking);
+
 String defaultThinkingLabel(bool done, Duration? duration) {
   if (!done) return 'Thinking';
   if (duration == null) return 'Thoughts';

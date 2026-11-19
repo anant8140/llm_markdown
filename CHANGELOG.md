@@ -9,6 +9,19 @@
 * Labels on Mermaid flowchart edges sit in a gap of the line, not on top of
   it.
 * A tap anywhere on a drawn SVG opens it, also on a see-through part.
+* Nothing about the look is fixed any more:
+  * New parts of `StreamingMarkdownStyle`: `highlightColor`, `spoilerColor`,
+    `citationDecoration`, `citationTextStyle`, `kbdDecoration`,
+    `thinkingStyle`, `imageBarrierColor`, `bullets`, `tableCellPadding` and
+    `diagramStyle` (`MarkdownDiagramStyle`: node, line, note and pie colors).
+  * `thinkingBuilder` and `cursorBuilder` replace the thinking section and
+    the cursor with your own widgets; `elementBuilders['li']` draws list
+    items.
+  * `MarkdownSelectionArea` takes `menuColor`, `menuTextStyle`,
+    `menuBorderRadius`, `handleColor`, or a whole `menuBuilder`.
+  * `labels: MarkdownLabels(...)` replaces every built-in word ("Copy",
+    "Show code", alert titles, ...), on a widget or for the whole app with
+    `StreamingMarkdownTheme(labels: ...)`.
 * The example app shows the 0.3.0 features, and the demo GIF is new.
 
 ## 0.3.0

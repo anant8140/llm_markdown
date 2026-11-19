@@ -26,17 +26,26 @@ export 'src/extras.dart'
     show CopyReplyButton, JumpToLatest, JumpToLatestBuilder, MarkdownShimmer;
 export 'src/headings.dart' show MarkdownHeading, MarkdownHeadings;
 export 'src/safety.dart' show defaultImageSchemes, defaultLinkSchemes;
+export 'src/labels.dart' show MarkdownLabels;
 export 'src/mermaid/mermaid_view.dart' show MermaidDiagram;
 export 'src/renderer.dart'
     show
         MarkdownCodeBlockBuilder,
+        MarkdownCursorBuilder,
         MarkdownElementBuilder,
         MarkdownImageBuilder,
         MarkdownImageTapCallback,
         MarkdownMathBuilder,
         StreamingCursorStyle;
-export 'src/selection.dart' show MarkdownSelectionAction, MarkdownSelectionArea;
+export 'src/selection.dart'
+    show
+        MarkdownSelectionAction,
+        MarkdownSelectionArea,
+        MarkdownSelectionMenuBuilder,
+        MarkdownSelectionMenuItem;
 export 'src/smoothing.dart' show RevealUnit, Smoothing;
 export 'src/streaming_markdown.dart' show StreamingMarkdown;
-export 'src/style.dart' show StreamingMarkdownStyle, StreamingMarkdownTheme;
-export 'src/thinking.dart' show ThinkingLabelBuilder;
+export 'src/style.dart'
+    show MarkdownDiagramStyle, StreamingMarkdownStyle, StreamingMarkdownTheme;
+export 'src/thinking.dart'
+    show MarkdownThinking, MarkdownThinkingBuilder, ThinkingLabelBuilder;

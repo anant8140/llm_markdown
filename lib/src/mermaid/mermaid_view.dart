@@ -153,11 +153,19 @@ const List<Color> _palette = [
 
 class _SceneBuilder {
   _SceneBuilder(this.style, this.scaler, this.direction)
-    : text = style.textStyle.color ?? const Color(0xFF808080),
-      labelStyle = style.textStyle.copyWith(
-        fontSize: (style.textStyle.fontSize ?? 14) * 0.9,
-        height: 1.25,
-      );
+    : look = style.diagramStyle,
+      text =
+          style.diagramStyle.textStyle?.color ??
+          style.textStyle.color ??
+          const Color(0xFF808080),
+      labelStyle = style.textStyle
+          .copyWith(
+            fontSize: (style.textStyle.fontSize ?? 14) * 0.9,
+            height: 1.25,
+          )
+          .merge(style.diagramStyle.textStyle);
+
+  final MarkdownDiagramStyle look;
 
   final StreamingMarkdownStyle style;
   final TextScaler scaler;
@@ -168,9 +176,10 @@ class _SceneBuilder {
   final List<void Function(Canvas)> ops = [];
   final List<TextPainter> painters = [];
 
-  Color get line => text.withValues(alpha: 0.6);
-  Color get fill => style.accentColor.withValues(alpha: 0.1);
-  Color get border => style.accentColor.withValues(alpha: 0.7);
+  Color get line => look.lineColor ?? text.withValues(alpha: 0.6);
+  Color get fill => look.nodeColor ?? style.accentColor.withValues(alpha: 0.1);
+  Color get border =>
+      look.nodeBorderColor ?? style.accentColor.withValues(alpha: 0.7);
 
   TextPainter measure(String label, {TextStyle? style, double maxWidth = 220}) {
     final painter = TextPainter(
@@ -473,10 +482,12 @@ class _SceneBuilder {
       if (label != null) {
         final painter = measure(
           label,
-          style: labelStyle.copyWith(
-            fontSize: (labelStyle.fontSize ?? 13) * 0.9,
-            color: text.withValues(alpha: 0.8),
-          ),
+          style: labelStyle
+              .copyWith(
+                fontSize: (labelStyle.fontSize ?? 13) * 0.9,
+                color: text.withValues(alpha: 0.8),
+              )
+              .merge(look.edgeLabelStyle),
           maxWidth: 140,
         );
         // on the middle of the edge's middle stretch, as Mermaid does
@@ -696,9 +707,12 @@ class _SceneBuilder {
             height: painter.height + 12,
           );
           final inside = Paint()
-            ..color = const Color(0xFFF2C94C).withValues(alpha: 0.22);
+            ..color =
+                look.noteColor ??
+                const Color(0xFFF2C94C).withValues(alpha: 0.22);
           final outline = stroke(
-            const Color(0xFFC9A227).withValues(alpha: 0.8),
+            look.noteBorderColor ??
+                const Color(0xFFC9A227).withValues(alpha: 0.8),
             1,
           );
           ops.add(
@@ -793,7 +807,9 @@ class _SceneBuilder {
     final circle = Rect.fromCircle(center: center, radius: radius);
     for (var i = 0; i < pie.slices.length; i++) {
       final (label, value) = pie.slices[i];
-      final color = _palette[i % _palette.length];
+      final colors = look.pieColors;
+      final palette = colors == null || colors.isEmpty ? _palette : colors;
+      final color = palette[i % palette.length];
       final sweep = value / total * 2 * math.pi;
       final paint = Paint()..color = color;
       final start = angle;

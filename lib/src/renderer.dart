@@ -10,6 +10,7 @@ import 'direction.dart';
 import 'fade.dart';
 import 'headings.dart';
 import 'icons.dart';
+import 'labels.dart';
 import 'mermaid/mermaid_view.dart';
 import 'package:llm_markdown_parser/llm_markdown_parser.dart';
 import 'safety.dart';
@@ -28,6 +29,12 @@ typedef MarkdownImageBuilder =
 /// inside a paragraph become inline widgets.
 typedef MarkdownElementBuilder =
     Widget? Function(BuildContext context, md.Element element, bool isComplete);
+
+/// Builds the cursor shown at the end of text that is still arriving, in
+/// place of the built-in one. [textStyle] is the style of the text it
+/// follows.
+typedef MarkdownCursorBuilder =
+    Widget Function(BuildContext context, TextStyle textStyle);
 
 /// Called when an image is tapped, with its address and alternative text.
 typedef MarkdownImageTapCallback = void Function(Uri uri, String? alt);
@@ -108,6 +115,10 @@ class RenderSettings {
   bool diagrams = true;
 
   Map<String, MarkdownElementBuilder> elementBuilders = const {};
+
+  MarkdownLabels labels = const MarkdownLabels();
+
+  MarkdownCursorBuilder? cursorBuilder;
 
   Color? searchColor;
 
@@ -383,11 +394,13 @@ class _Builder {
 
   InlineSpan _cursor(TextStyle textStyle) => WidgetSpan(
     alignment: PlaceholderAlignment.middle,
-    child: StreamingCursor(
-      color: style.accentColor,
-      fontSize: textStyle.fontSize ?? 14,
-      style: settings.cursorStyle,
-    ),
+    child:
+        settings.cursorBuilder?.call(context, textStyle) ??
+        StreamingCursor(
+          color: style.accentColor,
+          fontSize: textStyle.fontSize ?? 14,
+          style: settings.cursorStyle,
+        ),
   );
 
   Widget blocks(List<md.Node> nodes, {md.Element? parent}) {
@@ -508,7 +521,11 @@ class _Builder {
         return _directed(element.textContent, _table(element));
       case detailsTag:
         return ThinkingSection(
-          label: element.attributes['summary'] ?? 'Details',
+          // "Details" is what the parser puts when there is no <summary>
+          label: switch (element.attributes['summary']) {
+            null || 'Details' => settings.labels.details,
+            final summary => summary,
+          },
           done: true,
           color: style.codeBlockHeaderStyle.color ?? style.accentColor,
           textStyle: style.textStyle.copyWith(fontWeight: FontWeight.w600),
@@ -579,7 +596,9 @@ class _Builder {
     ).firstMatch(alert.attributes['class']!)![1]!;
     final color = style.alertColors[type] ?? style.accentColor;
     final children = alert.children ?? const <md.Node>[];
-    final title = children.isEmpty ? '' : children.first.textContent;
+    final title =
+        settings.labels.alertTitles[type] ??
+        (children.isEmpty ? '' : children.first.textContent);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.06),
@@ -769,7 +788,11 @@ class _Builder {
         return [_script(node.textContent, textStyle, up: node.tag == 'sup')];
       case 'mark':
         return styled(
-          TextStyle(backgroundColor: style.accentColor.withValues(alpha: 0.22)),
+          TextStyle(
+            backgroundColor:
+                style.highlightColor ??
+                style.accentColor.withValues(alpha: 0.22),
+          ),
         );
       case 'u' || 'ins':
         return styled(const TextStyle(decoration: TextDecoration.underline));
@@ -781,11 +804,13 @@ class _Builder {
             alignment: PlaceholderAlignment.middle,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: style.dividerColor),
-                color: style.tableHeaderColor,
-              ),
+              decoration:
+                  style.kbdDecoration ??
+                  BoxDecoration(
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: style.dividerColor),
+                    color: style.tableHeaderColor,
+                  ),
               child: Text(
                 node.textContent,
                 style: style.inlineCodeStyle.copyWith(backgroundColor: null),
@@ -800,7 +825,12 @@ class _Builder {
             child: _Spoiler(
               text: node.textContent,
               style: textStyle,
-              cover: style.textStyle.color ?? const Color(0xFF808080),
+              cover:
+                  style.spoilerColor ??
+                  (style.textStyle.color ?? const Color(0xFF808080)).withValues(
+                    alpha: 0.85,
+                  ),
+              hint: settings.labels.spoilerHint,
             ),
           ),
         ];
@@ -811,24 +841,28 @@ class _Builder {
             alignment: PlaceholderAlignment.middle,
             child: Semantics(
               button: true,
-              label: 'Source $number',
+              label: settings.labels.citation?.call(number) ?? 'Source $number',
               excludeSemantics: true,
               child: GestureDetector(
                 onTap: () => settings.onCitationTap?.call(number),
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 2),
                   padding: const EdgeInsets.symmetric(horizontal: 6),
-                  decoration: BoxDecoration(
-                    color: style.accentColor.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  decoration:
+                      style.citationDecoration ??
+                      BoxDecoration(
+                        color: style.accentColor.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                   child: Text(
                     '$number',
-                    style: textStyle.copyWith(
-                      fontSize: (textStyle.fontSize ?? 14) * 0.75,
-                      color: style.accentColor,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: textStyle
+                        .copyWith(
+                          fontSize: (textStyle.fontSize ?? 14) * 0.75,
+                          color: style.accentColor,
+                          fontWeight: FontWeight.w600,
+                        )
+                        .merge(style.citationTextStyle),
                   ),
                 ),
               ),
@@ -949,9 +983,12 @@ class _Builder {
           PageRouteBuilder<void>(
             opaque: false,
             barrierDismissible: true,
-            barrierColor: const Color(0xE6000000),
-            barrierLabel: 'Close image',
-            pageBuilder: (context, _, _) => ImageViewer(child: build(context)),
+            barrierColor: style.imageBarrierColor,
+            barrierLabel: settings.labels.closeImage,
+            pageBuilder: (context, _, _) => ImageViewer(
+              label: settings.labels.closeImage,
+              child: build(context),
+            ),
           ),
         ),
       );
@@ -987,8 +1024,9 @@ class _Builder {
   Widget _list(md.Element list) {
     final ordered = list.tag == 'ol';
     var number = int.tryParse(list.attributes['start'] ?? '') ?? 1;
-    const bullets = ['•', '◦', '▪'];
+    final bullets = style.bullets.isEmpty ? const ['•'] : style.bullets;
     final bullet = bullets[_listDepth % bullets.length];
+    final itemBuilder = settings.elementBuilders['li'];
     final items = <Widget>[];
     _listDepth++;
     for (final item in list.children ?? const <md.Node>[]) {
@@ -1010,13 +1048,16 @@ class _Builder {
         );
       }
       number++;
-      final row = Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(width: style.listIndent, child: marker),
-          Expanded(child: blocks(children, parent: item)),
-        ],
-      );
+      // a builder for "li" draws the whole item, marker included
+      final row =
+          itemBuilder?.call(context, item, isComplete) ??
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(width: style.listIndent, child: marker),
+              Expanded(child: blocks(children, parent: item)),
+            ],
+          );
       final id = item.attributes['id'];
       items.add(
         id == null
@@ -1067,12 +1108,14 @@ class _Builder {
       return DiagramBlock(
         source: text,
         style: style,
+        labels: settings.labels,
         code: CodeBlockView(
           code: text,
           language: language,
           style: style,
           highlight: false,
           options: settings.codeBlocks,
+          labels: settings.labels,
         ),
       );
     }
@@ -1087,6 +1130,7 @@ class _Builder {
       fadeLength: identical(pre, cursorTarget) ? settings.fadeLength : 0,
       options: settings.codeBlocks,
       streaming: !isComplete,
+      labels: settings.labels,
     );
   }
 
@@ -1120,7 +1164,7 @@ class _Builder {
           }
           cells.add(
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: style.tableCellPadding,
               child: Text.rich(
                 TextSpan(style: textStyle, children: spans),
                 textAlign: align,
@@ -1165,11 +1209,13 @@ class _Spoiler extends StatefulWidget {
     required this.text,
     required this.style,
     required this.cover,
+    required this.hint,
   });
 
   final String text;
   final TextStyle style;
   final Color cover;
+  final String hint;
 
   @override
   State<_Spoiler> createState() => _SpoilerState();
@@ -1181,14 +1227,14 @@ class _SpoilerState extends State<_Spoiler> {
   @override
   Widget build(BuildContext context) => Semantics(
     button: !_shown,
-    label: _shown ? null : 'Spoiler, tap to show',
+    label: _shown ? null : widget.hint,
     child: GestureDetector(
       onTap: () => setState(() => _shown = !_shown),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 3),
         decoration: BoxDecoration(
-          color: _shown ? null : widget.cover.withValues(alpha: 0.85),
+          color: _shown ? null : widget.cover,
           borderRadius: BorderRadius.circular(4),
         ),
         child: Text(
@@ -1204,13 +1250,14 @@ class _SpoilerState extends State<_Spoiler> {
 
 /// A full screen image that can be pinched and dragged; a tap closes it.
 class ImageViewer extends StatelessWidget {
-  const ImageViewer({super.key, required this.child});
+  const ImageViewer({super.key, required this.label, required this.child});
 
+  final String label;
   final Widget child;
 
   @override
   Widget build(BuildContext context) => Semantics(
-    label: 'Close image',
+    label: label,
     button: true,
     child: GestureDetector(
       onTap: () => Navigator.of(context).maybePop(),
@@ -1228,11 +1275,13 @@ class DiagramBlock extends StatefulWidget {
     super.key,
     required this.source,
     required this.style,
+    required this.labels,
     required this.code,
   });
 
   final String source;
   final StreamingMarkdownStyle style;
+  final MarkdownLabels labels;
   final Widget code;
 
   @override
@@ -1253,7 +1302,7 @@ class _DiagramBlockState extends State<DiagramBlock> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Text(
-            _showCode ? 'Show diagram' : 'Show code',
+            _showCode ? widget.labels.showDiagram : widget.labels.showCode,
             style: style.codeBlockHeaderStyle,
           ),
         ),
@@ -1267,9 +1316,10 @@ class _DiagramBlockState extends State<DiagramBlock> {
           widget.code
         else
           DecoratedBox(
-            decoration: style.codeBlockDecoration,
+            decoration:
+                style.diagramStyle.decoration ?? style.codeBlockDecoration,
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: style.diagramStyle.padding,
               child: Directionality(
                 // boxes and arrows keep their sides; labels find their own
                 textDirection: TextDirection.ltr,

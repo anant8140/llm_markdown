@@ -19,6 +19,31 @@ class MarkdownSelectionAction {
   final ValueChanged<String> onSelected;
 }
 
+/// One button of the selection menu, for a custom [MarkdownSelectionArea.menuBuilder].
+@immutable
+class MarkdownSelectionMenuItem {
+  /// Creates a menu item.
+  const MarkdownSelectionMenuItem({
+    required this.label,
+    required this.onPressed,
+  });
+
+  /// The text of the button.
+  final String label;
+
+  /// What the button does; it also closes the menu where that is expected.
+  final VoidCallback onPressed;
+}
+
+/// Builds the whole selection menu. [anchors] says where the selection is:
+/// its `primaryAnchor` is above it, its `secondaryAnchor` below.
+typedef MarkdownSelectionMenuBuilder =
+    Widget Function(
+      BuildContext context,
+      List<MarkdownSelectionMenuItem> items,
+      TextSelectionToolbarAnchors anchors,
+    );
+
 /// Makes the replies inside it selectable, with a menu for the selection:
 /// Copy, Select all and your own [actions].
 ///
@@ -48,6 +73,11 @@ class MarkdownSelectionArea extends StatefulWidget {
     this.copyLabel = 'Copy',
     this.selectAllLabel = 'Select all',
     this.focusNode,
+    this.menuColor = const Color(0xFF2B2D31),
+    this.menuTextStyle,
+    this.menuBorderRadius = const BorderRadius.all(Radius.circular(8)),
+    this.handleColor,
+    this.menuBuilder,
   });
 
   /// The chat, a reply, or anything else with text in it.
@@ -69,6 +99,24 @@ class MarkdownSelectionArea extends StatefulWidget {
   /// The focus node of the selection; one is made when not given.
   final FocusNode? focusNode;
 
+  /// The background of the menu.
+  final Color menuColor;
+
+  /// Merged onto the text of the menu's buttons, which is light by default.
+  final TextStyle? menuTextStyle;
+
+  /// The corners of the menu.
+  final BorderRadius menuBorderRadius;
+
+  /// The drag handles at the ends of the selection on touch screens;
+  /// defaults to the cursor color of the surrounding
+  /// [DefaultSelectionStyle].
+  final Color? handleColor;
+
+  /// Builds the menu yourself, for example with your design library's
+  /// toolbar; the colors above are then not used.
+  final MarkdownSelectionMenuBuilder? menuBuilder;
+
   @override
   State<MarkdownSelectionArea> createState() => _MarkdownSelectionAreaState();
 }
@@ -88,33 +136,42 @@ class _MarkdownSelectionAreaState extends State<MarkdownSelectionArea> {
   }
 
   Widget _menu(BuildContext context, SelectableRegionState region) {
-    final buttons = <(String, VoidCallback)>[
+    MarkdownSelectionMenuItem button(String label, VoidCallback onPressed) =>
+        MarkdownSelectionMenuItem(label: label, onPressed: onPressed);
+    final items = [
       for (final item in region.contextMenuButtonItems)
         if (item.onPressed != null)
           if (item.type == ContextMenuButtonType.copy)
-            (widget.copyLabel, item.onPressed!)
+            button(widget.copyLabel, item.onPressed!)
           else if (item.type == ContextMenuButtonType.selectAll)
-            (widget.selectAllLabel, item.onPressed!)
+            button(widget.selectAllLabel, item.onPressed!)
           else if (item.label != null)
-            (item.label!, item.onPressed!),
+            button(item.label!, item.onPressed!),
       if (_selected.isNotEmpty)
         for (final action in widget.actions)
-          (
-            action.label,
-            () {
-              final text = _selected;
-              region.hideToolbar();
-              action.onSelected(text);
-            },
-          ),
+          button(action.label, () {
+            final text = _selected;
+            region.hideToolbar();
+            action.onSelected(text);
+          }),
     ];
-    if (buttons.isEmpty) return const SizedBox.shrink();
-    return SelectionMenu(anchors: region.contextMenuAnchors, buttons: buttons);
+    if (items.isEmpty) return const SizedBox.shrink();
+    final anchors = region.contextMenuAnchors;
+    final custom = widget.menuBuilder;
+    if (custom != null) return custom(context, items, anchors);
+    return SelectionMenu(
+      anchors: anchors,
+      items: items,
+      color: widget.menuColor,
+      textStyle: widget.menuTextStyle,
+      borderRadius: widget.menuBorderRadius,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final accent =
+        widget.handleColor ??
         DefaultSelectionStyle.of(context).cursorColor ??
         const Color(0xFF1A73E8);
     return SelectableRegion(
@@ -135,11 +192,17 @@ class SelectionMenu extends StatelessWidget {
   const SelectionMenu({
     super.key,
     required this.anchors,
-    required this.buttons,
+    required this.items,
+    required this.color,
+    required this.borderRadius,
+    this.textStyle,
   });
 
   final TextSelectionToolbarAnchors anchors;
-  final List<(String, VoidCallback)> buttons;
+  final List<MarkdownSelectionMenuItem> items;
+  final Color color;
+  final BorderRadius borderRadius;
+  final TextStyle? textStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -149,8 +212,13 @@ class SelectionMenu extends StatelessWidget {
     final below =
         (anchors.secondaryAnchor ?? anchors.primaryAnchor) +
         const Offset(0, 26);
-    const background = Color(0xFF2B2D31);
-    const foreground = Color(0xFFF2F2F2);
+    final text = const TextStyle(
+      color: Color(0xFFF2F2F2),
+      fontSize: 14,
+      height: 1.2,
+      fontWeight: FontWeight.w500,
+      decoration: TextDecoration.none,
+    ).merge(textStyle);
     return Padding(
       padding: EdgeInsets.fromLTRB(8, top, 8, 8),
       child: CustomSingleChildLayout(
@@ -160,8 +228,8 @@ class SelectionMenu extends StatelessWidget {
         ),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(8),
+            color: color,
+            borderRadius: borderRadius,
             boxShadow: const [
               BoxShadow(
                 color: Color(0x40000000),
@@ -171,40 +239,34 @@ class SelectionMenu extends StatelessWidget {
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: borderRadius,
             // many buttons on a narrow screen scroll sideways
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  for (var i = 0; i < buttons.length; i++) ...[
+                  for (var i = 0; i < items.length; i++) ...[
                     if (i > 0)
-                      const SizedBox(
+                      SizedBox(
                         width: 1,
                         height: 20,
-                        child: ColoredBox(color: Color(0x33FFFFFF)),
+                        child: ColoredBox(
+                          color: (text.color ?? const Color(0xFFFFFFFF))
+                              .withValues(alpha: 0.2),
+                        ),
                       ),
                     Semantics(
                       button: true,
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onTap: buttons[i].$2,
+                        onTap: items[i].onPressed,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
                             vertical: 10,
                           ),
-                          child: Text(
-                            buttons[i].$1,
-                            style: const TextStyle(
-                              color: foreground,
-                              fontSize: 14,
-                              height: 1.2,
-                              fontWeight: FontWeight.w500,
-                              decoration: TextDecoration.none,
-                            ),
-                          ),
+                          child: Text(items[i].label, style: text),
                         ),
                       ),
                     ),

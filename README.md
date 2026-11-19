@@ -315,6 +315,51 @@ widget's own `style` wins. Besides `fromColors` there are the `compact`,
 `spacious` and `terminal` presets. In a Material app the style can live in a
 `ThemeExtension` whose `lerp` calls `StreamingMarkdownStyle.lerp`.
 
+### Full control of the design
+
+Nothing about the look is fixed. From the smallest change to the biggest:
+
+| You want to change | Use |
+| --- | --- |
+| Fonts, text colors, heading sizes, links | `textStyle`, `headingStyles`, `linkStyle`, `inlineCodeStyle` |
+| Spacing | `blockSpacing`, `listIndent`, `blockPadding`, `tableCellPadding` |
+| Code blocks | `codeBlockDecoration`, `codeBlockTextStyle`, `codeBlockHeaderStyle`, `codeTheme`, `CodeBlockOptions.copyButtonBuilder` / `actionsBuilder` |
+| Quotes, tables, rules, alerts | `blockquoteDecoration`, `tableHeaderColor`, `dividerColor`, `alertColors` |
+| Highlight, spoiler, key caps, citation chips | `highlightColor`, `spoilerColor`, `kbdDecoration`, `citationDecoration`, `citationTextStyle` |
+| List bullets | `bullets: ['→', '–']` |
+| Diagrams | `diagramStyle: MarkdownDiagramStyle(nodeColor:, lineColor:, pieColors:, ...)` |
+| Thinking section | `thinkingStyle`, or `thinkingBuilder` for your own widget |
+| Cursor | `cursorStyle`, or `cursorBuilder` for your own widget |
+| Image viewer | `imageBarrierColor`, or `onImageTap` to open your own |
+| Selection menu | `MarkdownSelectionArea(menuColor:, menuTextStyle:, handleColor:)`, or `menuBuilder` |
+| Any element at all | `elementBuilders: {'blockquote': ..., 'table': ..., 'li': ..., 'cite': ...}` |
+| Every built-in word | `labels: MarkdownLabels(copy: ..., showCode: ..., alertTitles: {...})` |
+
+All the names in the first rows are parts of `StreamingMarkdownStyle`; change
+them with `copyWith`.
+
+```dart
+StreamingMarkdown(
+  controller: controller,
+  style: StreamingMarkdownStyle.of(context).copyWith(
+    highlightColor: Colors.yellow.withValues(alpha: 0.4),
+    bullets: const ['→'],
+    diagramStyle: MarkdownDiagramStyle(
+      nodeColor: scheme.secondaryContainer,
+      nodeBorderColor: scheme.secondary,
+      lineColor: scheme.outline,
+    ),
+  ),
+  labels: const MarkdownLabels(copy: 'Kopieren', alertTitles: {'tip': 'Tipp'}),
+  cursorBuilder: (context, textStyle) => const MyBlinkingDot(),
+  thinkingBuilder: (context, thinking) => MyThinkingCard(
+    title: thinking.label,
+    busy: !thinking.done,
+    child: thinking.content,
+  ),
+)
+```
+
 ### Without Flutter
 
 The parser is its own pure Dart package,

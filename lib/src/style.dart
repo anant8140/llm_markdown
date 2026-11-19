@@ -5,6 +5,8 @@ import 'package:flutter/widgets.dart';
 import 'package:re_highlight/styles/atom-one-dark.dart';
 import 'package:re_highlight/styles/atom-one-light.dart';
 
+import 'labels.dart';
+
 const List<String> _monospaceFallback = [
   'Menlo',
   'SF Mono',
@@ -68,6 +70,19 @@ class StreamingMarkdownStyle {
     this.blockSpacing = 12,
     this.listIndent = 24,
     this.blockPadding = const {},
+    this.highlightColor,
+    this.spoilerColor,
+    this.citationDecoration,
+    this.citationTextStyle,
+    this.kbdDecoration,
+    this.thinkingStyle,
+    this.imageBarrierColor = const Color(0xE6000000),
+    this.bullets = const ['•', '◦', '▪'],
+    this.tableCellPadding = const EdgeInsets.symmetric(
+      horizontal: 12,
+      vertical: 8,
+    ),
+    this.diagramStyle = const MarkdownDiagramStyle(),
   }) : assert(headingStyles.length == 6, 'headingStyles needs 6 styles');
 
   /// A style built from a body [textStyle] and an [accentColor] for links,
@@ -287,6 +302,39 @@ class StreamingMarkdownStyle {
   /// the tag of a custom syntax. For example `{'h2': EdgeInsets.only(top: 8)}`.
   final Map<String, EdgeInsetsGeometry> blockPadding;
 
+  /// The background of `==highlighted==` text; defaults to a tint of
+  /// [accentColor].
+  final Color? highlightColor;
+
+  /// The cover of a hidden `||spoiler||`; defaults to the text color.
+  final Color? spoilerColor;
+
+  /// The chip behind a citation such as `[1]`; defaults to a rounded tint
+  /// of [accentColor].
+  final BoxDecoration? citationDecoration;
+
+  /// Merged onto the text of a citation chip.
+  final TextStyle? citationTextStyle;
+
+  /// The key cap around `<kbd>` text.
+  final BoxDecoration? kbdDecoration;
+
+  /// Merged onto the title of the thinking section; its color is also the
+  /// color of the arrow and of the line beside the thoughts.
+  final TextStyle? thinkingStyle;
+
+  /// What is behind an image opened full screen.
+  final Color imageBarrierColor;
+
+  /// The markers of bulleted lists, by depth; deeper lists start over.
+  final List<String> bullets;
+
+  /// The space inside a table cell.
+  final EdgeInsetsGeometry tableCellPadding;
+
+  /// The colors of drawn diagrams.
+  final MarkdownDiagramStyle diagramStyle;
+
   /// Blends two styles, for animated theme changes, e.g. from a Material
   /// `ThemeExtension.lerp`. Highlighting colors, alert colors and padding
   /// switch halfway.
@@ -329,6 +377,32 @@ class StreamingMarkdownStyle {
       blockSpacing: lerpDouble(a.blockSpacing, b.blockSpacing, t)!,
       listIndent: lerpDouble(a.listIndent, b.listIndent, t)!,
       blockPadding: first ? a.blockPadding : b.blockPadding,
+      highlightColor: Color.lerp(a.highlightColor, b.highlightColor, t),
+      spoilerColor: Color.lerp(a.spoilerColor, b.spoilerColor, t),
+      citationDecoration: BoxDecoration.lerp(
+        a.citationDecoration,
+        b.citationDecoration,
+        t,
+      ),
+      citationTextStyle: TextStyle.lerp(
+        a.citationTextStyle,
+        b.citationTextStyle,
+        t,
+      ),
+      kbdDecoration: BoxDecoration.lerp(a.kbdDecoration, b.kbdDecoration, t),
+      thinkingStyle: TextStyle.lerp(a.thinkingStyle, b.thinkingStyle, t),
+      imageBarrierColor: Color.lerp(
+        a.imageBarrierColor,
+        b.imageBarrierColor,
+        t,
+      )!,
+      bullets: first ? a.bullets : b.bullets,
+      tableCellPadding: EdgeInsetsGeometry.lerp(
+        a.tableCellPadding,
+        b.tableCellPadding,
+        t,
+      )!,
+      diagramStyle: first ? a.diagramStyle : b.diagramStyle,
     );
   }
 
@@ -350,6 +424,16 @@ class StreamingMarkdownStyle {
     double? blockSpacing,
     double? listIndent,
     Map<String, EdgeInsetsGeometry>? blockPadding,
+    Color? highlightColor,
+    Color? spoilerColor,
+    BoxDecoration? citationDecoration,
+    TextStyle? citationTextStyle,
+    BoxDecoration? kbdDecoration,
+    TextStyle? thinkingStyle,
+    Color? imageBarrierColor,
+    List<String>? bullets,
+    EdgeInsetsGeometry? tableCellPadding,
+    MarkdownDiagramStyle? diagramStyle,
   }) => StreamingMarkdownStyle(
     textStyle: textStyle ?? this.textStyle,
     headingStyles: headingStyles ?? this.headingStyles,
@@ -367,6 +451,16 @@ class StreamingMarkdownStyle {
     blockSpacing: blockSpacing ?? this.blockSpacing,
     listIndent: listIndent ?? this.listIndent,
     blockPadding: blockPadding ?? this.blockPadding,
+    highlightColor: highlightColor ?? this.highlightColor,
+    spoilerColor: spoilerColor ?? this.spoilerColor,
+    citationDecoration: citationDecoration ?? this.citationDecoration,
+    citationTextStyle: citationTextStyle ?? this.citationTextStyle,
+    kbdDecoration: kbdDecoration ?? this.kbdDecoration,
+    thinkingStyle: thinkingStyle ?? this.thinkingStyle,
+    imageBarrierColor: imageBarrierColor ?? this.imageBarrierColor,
+    bullets: bullets ?? this.bullets,
+    tableCellPadding: tableCellPadding ?? this.tableCellPadding,
+    diagramStyle: diagramStyle ?? this.diagramStyle,
   );
 
   @override
@@ -387,10 +481,20 @@ class StreamingMarkdownStyle {
       mapEquals(other.alertColors, alertColors) &&
       other.blockSpacing == blockSpacing &&
       other.listIndent == listIndent &&
-      mapEquals(other.blockPadding, blockPadding);
+      mapEquals(other.blockPadding, blockPadding) &&
+      other.highlightColor == highlightColor &&
+      other.spoilerColor == spoilerColor &&
+      other.citationDecoration == citationDecoration &&
+      other.citationTextStyle == citationTextStyle &&
+      other.kbdDecoration == kbdDecoration &&
+      other.thinkingStyle == thinkingStyle &&
+      other.imageBarrierColor == imageBarrierColor &&
+      listEquals(other.bullets, bullets) &&
+      other.tableCellPadding == tableCellPadding &&
+      other.diagramStyle == diagramStyle;
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     textStyle,
     Object.hashAll(headingStyles),
     inlineCodeStyle,
@@ -407,6 +511,120 @@ class StreamingMarkdownStyle {
     blockSpacing,
     listIndent,
     Object.hashAllUnordered(blockPadding.entries.map((e) => (e.key, e.value))),
+    highlightColor,
+    spoilerColor,
+    citationDecoration,
+    citationTextStyle,
+    kbdDecoration,
+    thinkingStyle,
+    imageBarrierColor,
+    Object.hashAll(bullets),
+    tableCellPadding,
+    diagramStyle,
+  ]);
+}
+
+/// The colors of drawn Mermaid diagrams. What is left null follows the text
+/// and accent colors of the [StreamingMarkdownStyle] it belongs to.
+@immutable
+class MarkdownDiagramStyle {
+  /// Creates a diagram style.
+  const MarkdownDiagramStyle({
+    this.nodeColor,
+    this.nodeBorderColor,
+    this.lineColor,
+    this.textStyle,
+    this.edgeLabelStyle,
+    this.noteColor,
+    this.noteBorderColor,
+    this.pieColors,
+    this.decoration,
+    this.padding = const EdgeInsets.all(12),
+  });
+
+  /// The fill of flowchart nodes and of the name boxes of a sequence
+  /// diagram.
+  final Color? nodeColor;
+
+  /// The outline of nodes and name boxes.
+  final Color? nodeBorderColor;
+
+  /// Edges, arrows, messages and lifelines.
+  final Color? lineColor;
+
+  /// Merged onto the text inside nodes and on messages.
+  final TextStyle? textStyle;
+
+  /// Merged onto the labels of flowchart edges.
+  final TextStyle? edgeLabelStyle;
+
+  /// The fill of notes in a sequence diagram.
+  final Color? noteColor;
+
+  /// The outline of notes.
+  final Color? noteBorderColor;
+
+  /// The slices of a pie chart, in order; they repeat when there are more
+  /// slices than colors.
+  final List<Color>? pieColors;
+
+  /// The box around a diagram in a reply; defaults to the code block's.
+  final BoxDecoration? decoration;
+
+  /// The space between that box and the diagram.
+  final EdgeInsetsGeometry padding;
+
+  /// Returns a copy with the given parts replaced.
+  MarkdownDiagramStyle copyWith({
+    Color? nodeColor,
+    Color? nodeBorderColor,
+    Color? lineColor,
+    TextStyle? textStyle,
+    TextStyle? edgeLabelStyle,
+    Color? noteColor,
+    Color? noteBorderColor,
+    List<Color>? pieColors,
+    BoxDecoration? decoration,
+    EdgeInsetsGeometry? padding,
+  }) => MarkdownDiagramStyle(
+    nodeColor: nodeColor ?? this.nodeColor,
+    nodeBorderColor: nodeBorderColor ?? this.nodeBorderColor,
+    lineColor: lineColor ?? this.lineColor,
+    textStyle: textStyle ?? this.textStyle,
+    edgeLabelStyle: edgeLabelStyle ?? this.edgeLabelStyle,
+    noteColor: noteColor ?? this.noteColor,
+    noteBorderColor: noteBorderColor ?? this.noteBorderColor,
+    pieColors: pieColors ?? this.pieColors,
+    decoration: decoration ?? this.decoration,
+    padding: padding ?? this.padding,
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      other is MarkdownDiagramStyle &&
+      other.nodeColor == nodeColor &&
+      other.nodeBorderColor == nodeBorderColor &&
+      other.lineColor == lineColor &&
+      other.textStyle == textStyle &&
+      other.edgeLabelStyle == edgeLabelStyle &&
+      other.noteColor == noteColor &&
+      other.noteBorderColor == noteBorderColor &&
+      listEquals(other.pieColors, pieColors) &&
+      other.decoration == decoration &&
+      other.padding == padding;
+
+  @override
+  int get hashCode => Object.hash(
+    nodeColor,
+    nodeBorderColor,
+    lineColor,
+    textStyle,
+    edgeLabelStyle,
+    noteColor,
+    noteBorderColor,
+    pieColors == null ? null : Object.hashAll(pieColors!),
+    decoration,
+    padding,
   );
 }
 
@@ -422,11 +640,20 @@ class StreamingMarkdownTheme extends InheritedWidget {
   const StreamingMarkdownTheme({
     super.key,
     required this.style,
+    this.labels,
     required super.child,
   });
 
   /// The style of the `StreamingMarkdown` widgets below.
   final StreamingMarkdownStyle style;
+
+  /// The built-in text of the widgets below, for other languages.
+  final MarkdownLabels? labels;
+
+  /// The labels of the nearest theme, or null.
+  static MarkdownLabels? labelsOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<StreamingMarkdownTheme>()
+      ?.labels;
 
   /// The style of the nearest theme, or null.
   static StreamingMarkdownStyle? maybeOf(BuildContext context) => context
@@ -435,5 +662,5 @@ class StreamingMarkdownTheme extends InheritedWidget {
 
   @override
   bool updateShouldNotify(StreamingMarkdownTheme oldWidget) =>
-      style != oldWidget.style;
+      style != oldWidget.style || labels != oldWidget.labels;
 }

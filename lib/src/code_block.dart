@@ -49,6 +49,7 @@ import 'package:re_highlight/languages/yaml.dart';
 import 'package:re_highlight/re_highlight.dart';
 
 import 'code_options.dart';
+import 'labels.dart';
 import 'fade.dart';
 import 'icons.dart';
 import 'style.dart';
@@ -250,6 +251,7 @@ class CodeBlockView extends StatefulWidget {
     this.fadeLength = 0,
     this.options = const CodeBlockOptions(),
     this.streaming = false,
+    this.labels = const MarkdownLabels(),
   });
 
   final String code;
@@ -262,6 +264,7 @@ class CodeBlockView extends StatefulWidget {
   final CodeBlockOptions options;
   // the block is still arriving
   final bool streaming;
+  final MarkdownLabels labels;
 
   @override
   State<CodeBlockView> createState() => _CodeBlockViewState();
@@ -408,6 +411,7 @@ class _CodeBlockViewState extends State<CodeBlockView> {
     final header = style.codeBlockHeaderStyle;
     final base = style.codeBlockTextStyle;
     final copyLabel =
+        widget.labels.copy ??
         Localizations.of<WidgetsLocalizations>(
           context,
           WidgetsLocalizations,
@@ -483,8 +487,10 @@ class _CodeBlockViewState extends State<CodeBlockView> {
 
     final toggleText =
         (options.toggleLabel ??
-        (lines, expanded) =>
-            expanded ? 'Show less' : 'Show all $lines lines')(total, _expanded);
+        (lines, expanded) => expanded
+            ? widget.labels.showLess
+            : widget.labels.showAllLines?.call(lines) ??
+                  'Show all $lines lines')(total, _expanded);
 
     return DecoratedBox(
       decoration: style.codeBlockDecoration,
