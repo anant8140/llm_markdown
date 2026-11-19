@@ -35,6 +35,7 @@ export 'src/renderer.dart'
         MarkdownImageTapCallback,
         MarkdownMathBuilder,
         StreamingCursorStyle;
+export 'src/selection.dart' show MarkdownSelectionAction, MarkdownSelectionArea;
 export 'src/smoothing.dart' show RevealUnit, Smoothing;
 export 'src/streaming_markdown.dart' show StreamingMarkdown;
 export 'src/style.dart' show StreamingMarkdownStyle, StreamingMarkdownTheme;

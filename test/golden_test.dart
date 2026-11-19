@@ -158,6 +158,46 @@ void main() {
     await shoot(tester, _scene(text: _diagrams), 'diagrams', height: 1100);
   });
 
+  testWidgets('the selection menu', (tester) async {
+    tester.view
+      ..physicalSize = const Size(420, 240)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      WidgetsApp(
+        color: const Color(0xFF2196F3),
+        debugShowCheckedModeBanner: false,
+        pageRouteBuilder: <T>(settings, builder) => PageRouteBuilder<T>(
+          pageBuilder: (context, _, _) => builder(context),
+        ),
+        home: ColoredBox(
+          color: const Color(0xFFFFFFFF),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 110, 16, 16),
+            child: DefaultTextStyle(
+              style: const TextStyle(fontSize: 14, color: Color(0xFF202124)),
+              child: MarkdownSelectionArea(
+                actions: [
+                  MarkdownSelectionAction(label: 'Ask', onSelected: (_) {}),
+                  MarkdownSelectionAction(label: 'Quote', onSelected: (_) {}),
+                ],
+                child: const StreamingMarkdown.text(
+                  'Select a few of these words to see the menu.',
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.longPressAt(const Offset(120, 118));
+    await tester.pumpAndSettle();
+    await expectLater(
+      find.byType(WidgetsApp),
+      matchesGoldenFile('goldens/selection_menu.png'),
+    );
+  });
+
   testWidgets('half way through a stream', (tester) async {
     await shoot(
       tester,
