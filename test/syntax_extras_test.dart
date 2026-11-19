@@ -40,7 +40,7 @@ void main() {
     const cases = {
       r'x^2 + y^2': 'x² + y²',
       r'a_1 + a_{10}': 'a₁ + a₁₀',
-      r'\frac{1}{2}': '(1)/(2)',
+      r'\frac{1}{2}': '1/2',
       r'\sqrt{x}': '√(x)',
       r'\alpha \le \beta': 'α ≤ β',
       r'\sum_{i=1}^{n} i': '∑ᵢ₌₁ⁿ i',

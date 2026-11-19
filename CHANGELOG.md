@@ -70,6 +70,21 @@
   actions, without a design library.
 * The parser moved to the pure Dart package `llm_markdown_parser`, for
   servers and CLIs. `package:llm_markdown/parser.dart` re-exports it.
+* Fixes:
+  * `[1][2]` next to each other are both citation chips.
+  * `a==b && c==d` and `a||b||c` are no longer a highlight or a spoiler,
+    and `US$5 ... 5$` is no longer math.
+  * A half-typed `</sub>`, `> [!NOTE]`, `[^1]` or `[text][ref]` no longer
+    shows stray characters while streaming.
+  * An empty `<think></think>` no longer shows an empty thinking section.
+  * Math without a `mathBuilder` reads better: nested fractions, `\left(`,
+    `\{`, `\%`, `\mathbb{R}`, `\vec{v}`, `\sqrt[3]{x}`; `\frac{1}{2}` is
+    now `1/2`.
+  * Plain text keeps `[1]` for citations and footnotes, and the title of a
+    `<details>` section.
+  * A model stream survives a line that isn't JSON (a keep-alive, or an
+    event cut off by a dropped connection) and a broken UTF-8 byte.
+  * A custom-scheme autolink no longer swallows the full stop after it.
 
 ## 0.2.0
 

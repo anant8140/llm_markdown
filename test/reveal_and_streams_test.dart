@@ -241,6 +241,42 @@ void main() {
       expect(controller.isComplete, isTrue);
     });
 
+    test('lines that are not JSON are skipped, not fatal', () async {
+      String chunk(String content) =>
+          'data: ${jsonEncode({
+            'choices': [
+              {
+                'delta': {'content': content},
+              },
+            ],
+          })}\n\n';
+      // a keep-alive line in the middle, and a connection cut mid-event
+      final body = [
+        chunk('Hello'),
+        'data: ping\n\n',
+        chunk(' world'),
+        'data: {"choices":[{"del',
+      ].join();
+      final controller = StreamingMarkdownController();
+      await controller.addOpenAIStream(_body(body));
+      expect(controller.text, 'Hello world');
+      expect(controller.isComplete, isTrue);
+      expect(controller.error, isNull);
+
+      final other = StreamingMarkdownController();
+      await other.addAnthropicStream(
+        _body(
+          'data: not json\n\n'
+          'data: ${jsonEncode({
+            'type': 'content_block_delta',
+            'delta': {'type': 'text_delta', 'text': 'Hi'},
+          })}\n\n',
+        ),
+      );
+      expect(other.text, 'Hi');
+      expect(other.error, isNull);
+    });
+
     test('OpenAI Responses API events', () async {
       final body = [
         for (final e in [

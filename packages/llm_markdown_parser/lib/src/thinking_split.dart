@@ -26,14 +26,11 @@ ThinkingSplit splitThinking(String text, {required bool complete}) {
       final body = rest.substring(open.length);
       final end = body.indexOf(close);
       if (end == -1) {
-        return ThinkingSplit(
-          complete ? body : _withoutPartial(body, close),
-          '',
-          done: complete,
-        );
+        if (complete) return ThinkingSplit(_orNull(body), '', done: true);
+        return ThinkingSplit(_withoutPartial(body, close), '', done: false);
       }
       return ThinkingSplit(
-        body.substring(0, end),
+        _orNull(body.substring(0, end)),
         body.substring(end + close.length).replaceFirst(_leadingBlankLines, ''),
         done: true,
       );
@@ -47,6 +44,10 @@ ThinkingSplit splitThinking(String text, {required bool complete}) {
   }
   return ThinkingSplit(null, text, done: true);
 }
+
+// Some models send an empty <think></think> when they don't think; that is
+// no thinking, not an empty thought.
+String? _orNull(String thinking) => thinking.trim().isEmpty ? null : thinking;
 
 String _withoutPartial(String body, String close) {
   for (var length = close.length - 1; length > 0; length--) {

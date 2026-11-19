@@ -26,7 +26,8 @@ class InlineMathSyntax extends md.InlineSyntax {
             ? r'\\\((.+?)\\\)'
                   r'|\$\$(.+?)\$\$'
                   r'|\\\[(.+?)\\\]'
-                  r'|\$(?=[^\s$])((?:\\.|[^$\\\n])+?)(?<=[^\s\\])\$(?!\d)'
+                  // not right after a letter or digit: US$5 is a price
+                  r'|(?<![\w$])\$(?=[^\s$])((?:\\.|[^$\\\n])+?)(?<=[^\s\\])\$(?!\d)'
             // (?!)() never matches; it keeps the group numbers the same
             : r'\\\((.+?)\\\)|(?!)()|\\\[(.+?)\\\]',
       );
@@ -246,40 +247,207 @@ String? _script(String body, String digits, Map<String, String> other) {
 }
 
 /// A readable plain-text version of simple TeX, for when no math renderer
-/// is plugged in: `\alpha` becomes α, `x^2` x² and `\frac{a}{b}` (a)/(b).
-String texToUnicode(String tex) {
-  var text = tex.replaceAllMapped(
-    RegExp(r'\\frac\{([^{}]*)\}\{([^{}]*)\}'),
-    (m) => '(${m[1]})/(${m[2]})',
-  );
-  text = text.replaceAllMapped(
-    RegExp(r'\\sqrt\{([^{}]*)\}'),
-    (m) => '√(${m[1]})',
-  );
-  text = text.replaceAllMapped(
-    RegExp(r'\\(?:text|mathrm|mathbf|operatorname)\{([^{}]*)\}'),
-    (m) => m[1]!,
-  );
-  text = text.replaceAllMapped(
-    RegExp(r'\\([A-Za-z]+|,)'),
-    (m) => _symbols[m[1]] ?? m[1]!,
-  );
-  String scripts(
-    String input,
-    String mark,
-    String digits,
-    Map<String, String> other,
-  ) => input.replaceAllMapped(
-    RegExp('\\$mark(?:\\{([^{}]*)\\}|([0-9a-z+\\-=()]))'),
-    (m) {
-      final body = m[1] ?? m[2]!;
-      return _script(body, digits, other) ?? '$mark($body)';
-    },
-  );
-  text = scripts(text, '^', _sup, _supOther);
-  text = scripts(text, '_', _sub, _subOther);
-  return text
-      .replaceAll(RegExp(r'[{}]'), '')
-      .replaceAll(RegExp(r' {2,}'), ' ')
-      .trim();
+/// is plugged in: `\alpha` becomes α, `x^2` x² and `\frac{a}{b}` a/b.
+String texToUnicode(String tex) => _TexReader(tex)
+    .read(null)
+    .replaceAll(RegExp(r'[ \t]{2,}'), ' ')
+    .replaceAll(RegExp(r' *\n *'), '\n')
+    .trim();
+
+// \mathbb{R}
+const Map<String, String> _doubleStruck = {
+  'C': 'ℂ',
+  'N': 'ℕ',
+  'Q': 'ℚ',
+  'R': 'ℝ',
+  'Z': 'ℤ',
+};
+
+// \vec{v}: a combining mark after the letter
+const Map<String, String> _accents = {
+  'vec': '⃗',
+  'hat': '̂',
+  'widehat': '̂',
+  'bar': '̄',
+  'overline': '̅',
+  'tilde': '̃',
+  'widetilde': '̃',
+  'dot': '̇',
+  'ddot': '̈',
+};
+
+// commands whose argument is shown as it is
+const Set<String> _plainWrappers = {
+  'text',
+  'textbf',
+  'textit',
+  'textrm',
+  'mathrm',
+  'mathbf',
+  'mathit',
+  'mathsf',
+  'mathtt',
+  'mathcal',
+  'boldsymbol',
+  'operatorname',
+  'mbox',
+};
+
+// sizing and layout commands that draw nothing themselves
+const Set<String> _silent = {
+  'left',
+  'right',
+  'big',
+  'Big',
+  'bigg',
+  'Bigg',
+  'bigl',
+  'bigr',
+  'displaystyle',
+  'textstyle',
+  'limits',
+  'nolimits',
+};
+
+const Map<String, String> _roots = {'2': '√', '3': '∛', '4': '∜'};
+
+final RegExp _letters = RegExp('[A-Za-z]+');
+final RegExp _simple = RegExp(r'^[\p{L}\p{N}.]+$', unicode: true);
+
+class _TexReader {
+  _TexReader(this.source);
+
+  final String source;
+  int at = 0;
+
+  bool get done => at >= source.length;
+
+  // Reads up to [stop] ("}" or "]") or the end.
+  String read(String? stop) {
+    final out = StringBuffer();
+    while (!done) {
+      final char = source[at];
+      if (char == stop) {
+        at++;
+        break;
+      }
+      switch (char) {
+        case r'\':
+          out.write(command());
+        case '{':
+          at++;
+          out.write(read('}'));
+        case '}':
+          // a closing brace with nothing open
+          at++;
+        case '^':
+          at++;
+          out.write(script('^', _sup, _supOther));
+        case '_':
+          at++;
+          out.write(script('_', _sub, _subOther));
+        case '&' || '~':
+          at++;
+          out.write(' ');
+        default:
+          at++;
+          out.write(char);
+      }
+    }
+    return out.toString();
+  }
+
+  // The next thing a command or script applies to: a {group}, a \command
+  // or one character. Empty at the end of the text.
+  String argument() {
+    while (!done && source[at] == ' ') {
+      at++;
+    }
+    if (done) return '';
+    final char = source[at];
+    if (char == '{') {
+      at++;
+      return read('}');
+    }
+    if (char == r'\') return command();
+    if (char == '}') return '';
+    at++;
+    return char;
+  }
+
+  String script(String mark, String digits, Map<String, String> other) {
+    final body = argument().trim();
+    if (body.isEmpty) return mark;
+    final small = _script(body, digits, other);
+    if (small != null) return small;
+    return body.runes.length == 1 ? '$mark$body' : '$mark($body)';
+  }
+
+  String command() {
+    at++; // the backslash
+    if (done) return '';
+    final name = _letters.matchAsPrefix(source, at)?[0];
+    if (name == null) {
+      final char = source[at++];
+      return switch (char) {
+        ',' || ';' || ':' || ' ' => ' ',
+        '!' => '',
+        r'\' => '\n',
+        // \{ \} \% \$ \& \# \_ are the characters themselves
+        _ => char,
+      };
+    }
+    at += name.length;
+    switch (name) {
+      case 'frac' || 'dfrac' || 'tfrac':
+        final above = argument().trim();
+        final below = argument().trim();
+        return '${_fractionPart(above)}/${_fractionPart(below)}';
+      case 'sqrt':
+        var root = '√';
+        if (!done && source[at] == '[') {
+          at++;
+          final index = read(']').trim();
+          root =
+              _roots[index] ?? '${_script(index, _sup, _supOther) ?? index}√';
+        }
+        return '$root(${argument().trim()})';
+      case 'mathbb':
+        final body = argument();
+        return _doubleStruck[body] ?? body;
+      case 'begin' || 'end':
+        // \begin{matrix}: the name is not part of the formula
+        argument();
+        return name == 'end' ? '' : ' ';
+    }
+    if (_plainWrappers.contains(name)) return argument();
+    final accent = _accents[name];
+    if (accent != null) return '${argument()}$accent';
+    if (_silent.contains(name)) {
+      // \left. and \right. are invisible brackets
+      if ((name == 'left' || name == 'right') && !done && source[at] == '.') {
+        at++;
+      }
+      return '';
+    }
+    // \alpha is α; an unknown name such as \sin is shown as "sin"
+    return _symbols[name] ?? name;
+  }
+
+  // a and 12 stand alone; a+b needs brackets to stay one thing
+  String _fractionPart(String part) =>
+      part.isEmpty || _simple.hasMatch(part) || _isBracketed(part)
+      ? part
+      : '($part)';
+
+  bool _isBracketed(String part) {
+    if (!part.startsWith('(') || !part.endsWith(')')) return false;
+    var depth = 0;
+    for (var i = 0; i < part.length; i++) {
+      if (part[i] == '(') depth++;
+      if (part[i] == ')') depth--;
+      if (depth == 0 && i < part.length - 1) return false;
+    }
+    return true;
+  }
 }

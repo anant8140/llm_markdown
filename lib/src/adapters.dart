@@ -5,6 +5,18 @@ import 'package:llm_markdown_parser/llm_markdown_parser.dart';
 
 import 'controller.dart';
 
+// Null for a line that isn't a JSON object: a keep-alive such as "ping",
+// or an event cut short because the connection dropped. Neither is a reason
+// to throw away the reply so far.
+Map<String, dynamic>? _json(String data) {
+  try {
+    final json = jsonDecode(data);
+    return json is Map<String, dynamic> ? json : null;
+  } on FormatException {
+    return null;
+  }
+}
+
 /// Feeds the event streams of common model APIs into a controller.
 extension ModelStreams on StreamingMarkdownController {
   /// Reads an OpenAI-style streaming response body and completes the reply.
@@ -16,8 +28,8 @@ extension ModelStreams on StreamingMarkdownController {
   Future<void> addOpenAIStream(Stream<List<int>> bytes) =>
       _feed(bytes, (event) {
         if (event.data == '[DONE]') return true;
-        final json = jsonDecode(event.data);
-        if (json is! Map<String, dynamic>) return false;
+        final json = _json(event.data);
+        if (json == null) return false;
         final error = json['error'];
         if (error != null) throw ModelStreamError(_message(error));
         switch (json['type']) {
@@ -47,8 +59,8 @@ extension ModelStreams on StreamingMarkdownController {
   /// [appendThinking].
   Future<void> addAnthropicStream(Stream<List<int>> bytes) =>
       _feed(bytes, (event) {
-        final json = jsonDecode(event.data);
-        if (json is! Map<String, dynamic>) return false;
+        final json = _json(event.data);
+        if (json == null) return false;
         switch (json['type']) {
           case 'content_block_delta':
             final delta = json['delta'];

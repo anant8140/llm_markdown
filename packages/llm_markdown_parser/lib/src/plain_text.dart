@@ -1,6 +1,7 @@
 import 'package:markdown/markdown.dart' as md;
 
 import 'math.dart';
+import 'syntaxes.dart';
 import 'thinking_split.dart';
 
 /// Returns [markdown] as plain text, for example to copy a reply into an app
@@ -55,7 +56,16 @@ void _blocks(List<md.Node> nodes, StringBuffer out, String indent) {
         }
         out.writeln();
       case 'hr':
-        out.writeln();
+        // the blocks around it already leave a blank line
+        break;
+      case detailsTag:
+        final summary = node.attributes['summary'];
+        if (summary != null && summary.isNotEmpty) {
+          out
+            ..writeln('$indent$summary')
+            ..writeln();
+        }
+        _blocks(node.children ?? const [], out, indent);
       case blockMathTag:
         out
           ..writeln('$indent${node.textContent}')
@@ -115,6 +125,13 @@ String _inline(List<md.Node> nodes) {
           out.write(node.attributes['checked'] == 'true' ? '[x] ' : '[ ] ');
         case 'img':
           out.write(node.attributes['alt'] ?? '');
+        case citationTag:
+          out.write('[${node.textContent}]');
+        case 'sup' when node.attributes['class'] == 'footnote-ref':
+          out.write('[${node.textContent}]');
+        case 'a' when node.attributes['class'] == 'footnote-backref':
+          // the "back to the text" arrow of a footnote
+          break;
         default:
           out.write(_inline(node.children ?? const []));
       }

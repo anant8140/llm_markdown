@@ -21,7 +21,10 @@ Stream<ServerSentEvent> serverSentEvents(Stream<List<int>> bytes) async* {
   String? event;
   final data = <String>[];
   await for (final line
-      in bytes.transform(utf8.decoder).transform(const LineSplitter())) {
+      // a broken byte becomes U+FFFD; it must not end the reply
+      in bytes
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .transform(const LineSplitter())) {
     if (line.isEmpty) {
       if (data.isNotEmpty) yield ServerSentEvent(data.join('\n'), event: event);
       event = null;

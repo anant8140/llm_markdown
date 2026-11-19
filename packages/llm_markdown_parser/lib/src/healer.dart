@@ -10,6 +10,11 @@ final RegExp _tableDelimiterRow = RegExp(
 final RegExp _partialTableDelimiter = RegExp(r'^ {0,3}\|[ \t:|-]*$');
 final RegExp _wordCharacter = RegExp(r'[\p{L}\p{N}]', unicode: true);
 
+// "> [!NO": the start of an alert marker such as "> [!NOTE]"
+final RegExp _partialAlertMarker = RegExp(
+  r'^ {0,3}>[ \t]*\[![A-Za-z]*\]?[ \t]*$',
+);
+
 /// Returns [source] changed so that its unfinished end renders cleanly.
 ///
 /// [source] is the end of a Markdown document that is still arriving. The
@@ -77,7 +82,9 @@ String healIncompleteMarkdown(String source, {bool dollarMath = true}) {
   final keep = _linesBeforeIncompleteTable(lines, last, partial);
   if (keep != null) return _joinFirst(lines, keep);
 
-  if (partial && _partialMarkerLine.hasMatch(lines[last])) {
+  if (partial &&
+      (_partialMarkerLine.hasMatch(lines[last]) ||
+          _partialAlertMarker.hasMatch(lines[last]))) {
     return _joinFirst(lines, last);
   }
 
@@ -241,6 +248,13 @@ String _healLinks(String line) {
   for (final position in open.reversed) {
     if (position > 0 && masked[position - 1] == '!') {
       result = result.substring(0, position - 1);
+    } else if (position > result.length) {
+      continue;
+    } else if (masked.startsWith('^', position + 1) ||
+        (position > 0 && masked[position - 1] == ']')) {
+      // "[^1" is a footnote mark and "[text][re" the name of a reference:
+      // neither is text to show
+      result = result.substring(0, position);
     } else if (position < result.length) {
       result = result.substring(0, position) + result.substring(position + 1);
     }
@@ -305,7 +319,8 @@ String _closeDelimiters(String line) {
         _wordCharacter.hasMatch(after)) {
       canOpen = false;
     }
-    if (char == '_') {
+    // snake_case and a==b are not emphasis or a highlight
+    if (char == '_' || char == '=') {
       if (before != null && _wordCharacter.hasMatch(before)) canOpen = false;
       if (after != null && _wordCharacter.hasMatch(after)) canClose = false;
     }
@@ -375,7 +390,10 @@ final RegExp _openSafeTag = RegExp(
 
 // "text <su" hides the half tag; "<sub>2" closes it as "<sub>2</sub>".
 String _healHtml(String line) {
-  final open = _openSafeTag.firstMatch(line);
-  if (open != null) return '$line</${open[1]}>';
-  return line.replaceFirst(_partialTag, '');
+  // first drop a tag that is still being typed, also a closing one, so
+  // "<sub>2</su" becomes "<sub>2" and is then closed like any open tag
+  final whole = line.replaceFirst(_partialTag, '');
+  final open = _openSafeTag.firstMatch(whole);
+  if (open != null) return '$whole</${open[1]}>';
+  return whole;
 }

@@ -121,7 +121,8 @@ bool _sameSyntaxes(List<Object> a, List<Object> b) {
 }
 
 class HighlightSyntax extends md.InlineSyntax {
-  HighlightSyntax() : super(r'==(?=\S)(.+?)(?<=\S)==');
+  // not between word characters: a==b && c==d is code
+  HighlightSyntax() : super(r'(?<![\w=])==(?=\S)(.+?)(?<=\S)==(?![\w=])');
 
   @override
   bool onMatch(md.InlineParser parser, Match match) {
@@ -131,7 +132,7 @@ class HighlightSyntax extends md.InlineSyntax {
 }
 
 class SpoilerSyntax extends md.InlineSyntax {
-  SpoilerSyntax() : super(r'\|\|(?=\S)(.+?)(?<=\S)\|\|');
+  SpoilerSyntax() : super(r'(?<![\w|])\|\|(?=\S)(.+?)(?<=\S)\|\|(?![\w|])');
 
   @override
   bool onMatch(md.InlineParser parser, Match match) {
@@ -141,9 +142,14 @@ class SpoilerSyntax extends md.InlineSyntax {
 }
 
 // [1] right after text, not a link ([text][1], [1](url), [1]: url) and not
-// array indexing (a[1]).
+// array indexing (a[1]). Several in a row, [1][2], are all citations.
 class CitationSyntax extends md.InlineSyntax {
-  CitationSyntax() : super(r'(?<![\w\]\[])\[(\d{1,3})\](?![(\[:])');
+  CitationSyntax() : super(r'(?<![\w\[])\[(\d{1,3})\](?![(:])');
+
+  static final RegExp _citationBefore = RegExp(
+    r'(?<![\w\[\]])(?:\[\d{1,3}\])+$',
+  );
+  static final RegExp _citationAfter = RegExp(r'\[(\d{1,3})\]');
 
   // Checked here and not in onMatch: an onMatch that returns false makes
   // the inline parser try the same spot again, forever.
@@ -154,8 +160,22 @@ class CitationSyntax extends md.InlineSyntax {
       startMatchPos ?? parser.pos,
     );
     if (match == null) return false;
+    final source = parser.source;
+    final references = parser.document.linkReferences;
     // a reference link such as [1]: https://... is a link, not a citation
-    if (parser.document.linkReferences.containsKey(match[1])) return false;
+    if (references.containsKey(match[1])) return false;
+    // after "]" only when that closes a citation too: [1][2], not [text][2]
+    if (match.start > 0 &&
+        source[match.start - 1] == ']' &&
+        !_citationBefore.hasMatch(source.substring(0, match.start))) {
+      return false;
+    }
+    // before "[" only when that is a citation and not the name of a
+    // reference: with "[2]: url" defined, [1][2] is a link
+    if (source.startsWith('[', match.end)) {
+      final next = _citationAfter.matchAsPrefix(source, match.end);
+      if (next == null || references.containsKey(next[1])) return false;
+    }
     return super.tryMatch(parser, startMatchPos);
   }
 
@@ -186,7 +206,9 @@ class SafeHtmlSyntax extends md.InlineSyntax {
 class SchemeAutolinkSyntax extends md.InlineSyntax {
   SchemeAutolinkSyntax(Set<String> schemes)
     : super(
-        '(?<![\\w/])(?:${schemes.map(RegExp.escape).join('|')})://[^\\s<>()]+',
+        // ends before the punctuation that closes the sentence
+        '(?<![\\w/])(?:${schemes.map(RegExp.escape).join('|')})://'
+        '[^\\s<>()]*[^\\s<>().,;:!?\'"]',
         caseSensitive: false,
       );
 
