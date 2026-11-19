@@ -3,6 +3,8 @@ include: package:flutter_lints/flutter.yaml
 analyzer:
   exclude:
     - build/**
+    # its own package, analyzed on its own (see .github/workflows/ci.yml)
+    - packages/**
     - android/**
     - ios/**
     - web/**
