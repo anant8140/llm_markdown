@@ -39,7 +39,10 @@ This package fixes that:
   `<details>`, plus citation chips (`[1]`), `==highlight==`, `||spoiler||`,
   `:emoji:` and a few safe HTML tags.
 - Code blocks with line numbers, wrapping, collapsing, 13 themes and your
-  own header buttons.
+  own header buttons, in a code font that comes with the package.
+- Mermaid flowcharts, sequence diagrams and pie charts are drawn, and SVG
+  images too.
+- A selectable area with a menu for your own actions ("Ask about this").
 - Find-in-chat highlighting, a table of contents, image zoom, previews with
   `maxLines`, and a sliver mode for very long replies.
 - Your own syntaxes and widgets for any element.
@@ -176,6 +179,7 @@ selectable. With `ListView(reverse: true)` you don't need
 | `sliver` | `false` | builds blocks lazily inside a `CustomScrollView` |
 | `syntax` | everything on | `MarkdownSyntax(dollarMath: false, ...)`, your own syntaxes |
 | `elementBuilders` | – | your widget for any element, by tag |
+| `diagrams` | `true` | draw finished ` ```mermaid ` blocks |
 | `announceWhenDone` | `true` | screen readers read the reply when it ends |
 | `detectTextDirection` | `true` | per-paragraph direction from the first letter |
 
@@ -206,9 +210,10 @@ StreamingMarkdown(
 ```
 
 `wrapLines` wraps long lines instead of scrolling sideways, and
-`copyButtonBuilder` replaces the copy button. For your own code font, pass
-`monospace:` to `StreamingMarkdownStyle.fromColors`, e.g.
-`GoogleFonts.jetBrainsMono()`.
+`copyButtonBuilder` replaces the copy button. Code is set in JetBrains Mono,
+which comes with the package (about 270 KB in your app), so it looks the
+same on every platform. For another font, pass `monospace:` to
+`StreamingMarkdownStyle.fromColors`.
 
 ### Long replies and chats
 
@@ -251,25 +256,43 @@ StreamingMarkdown(
 A custom block syntax must not contain blank lines, because a block is
 finished at the first blank line while the reply streams.
 
-### Diagrams, SVG and the selection menu
+### Diagrams and SVG
 
-These are left to packages that do them well:
+A ` ```mermaid ` block is shown as code while it streams and drawn as soon
+as its closing fence arrives, with a "Show code" switch under it.
+Flowcharts (`graph` / `flowchart`), sequence diagrams and pie charts are
+drawn natively, without a WebView. Other kinds (class, state, gantt, ...)
+stay code blocks; hand those to another renderer with `codeBlockBuilder` if
+you need them:
 
 ```dart
-// Mermaid: draw the block once its closing fence is there
 codeBlockBuilder: (context, code, language, isComplete) {
-  if (language != 'mermaid') return null;
-  return isComplete ? MermaidView(code) : const Text('Drawing…');
+  if (language != 'mermaid' || MermaidDiagram.supports(code)) return null;
+  return isComplete ? MyWebViewMermaid(code) : null;
 },
-
-// SVG images, with flutter_svg
-imageBuilder: (context, uri, alt) => uri.path.endsWith('.svg')
-    ? SvgPicture.network(uri.toString(), semanticsLabel: alt)
-    : Image.network(uri.toString(), semanticLabel: alt),
 ```
 
-Copy, "Ask about this" and other selection menu items come from the
-`SelectionArea` around the chat: pass it a `contextMenuBuilder`.
+`MermaidDiagram(source)` is a widget of its own too. Images whose address
+ends in `.svg` are drawn with `flutter_svg`.
+
+### Selecting text
+
+```dart
+MarkdownSelectionArea(
+  actions: [
+    MarkdownSelectionAction(
+      label: 'Ask about this',
+      onSelected: (text) => askAbout(text),
+    ),
+  ],
+  child: chatList,
+)
+```
+
+The menu has Copy, Select all and your actions, and `copyLabel` /
+`selectAllLabel` translate the first two. It uses no design library. A
+Material or Cupertino `SelectionArea` around the chat works as well, if you
+prefer its look.
 
 ### Styling
 
@@ -292,11 +315,14 @@ widget's own `style` wins. Besides `fromColors` there are the `compact`,
 `spacious` and `terminal` presets. In a Material app the style can live in a
 `ThemeExtension` whose `lerp` calls `StreamingMarkdownStyle.lerp`.
 
-### Without widgets
+### Without Flutter
 
-`package:llm_markdown/parser.dart` has the incremental parser,
-`healIncompleteMarkdown`, `markdownToPlainText` and `splitThinking`, and
-imports no Flutter, so it runs in a background isolate or in plain tests.
+The parser is its own pure Dart package,
+[llm_markdown_parser](https://pub.dev/packages/llm_markdown_parser): the
+incremental parser, `healIncompleteMarkdown`, `markdownToPlainText`,
+`splitThinking` and `serverSentEvents`. Use it on a server, in a CLI or in
+an isolate. From a Flutter app, `package:llm_markdown/parser.dart` gives the
+same thing.
 
 ## Performance
 
@@ -332,7 +358,9 @@ a normal parse of the full text. Golden images guard the look.
 - Raw HTML is shown as text, apart from `<sub> <sup> <kbd> <mark> <u>
   <ins> <small> <br>` and `<details>`.
 - Inline math has to fit on one line.
-- Mermaid, SVG and LaTeX layout come from other packages (see above).
+- Mermaid: flowcharts, sequence diagrams and pie charts only; `subgraph`
+  boxes and styling are left out.
+- LaTeX layout comes from the package you give to `mathBuilder`.
 - `markdown` 7.3.1 crashes on a link definition ending in a backslash
   (`[a]: /b\`); this package works around it, and shows the text as it is
   if the parser ever throws.
@@ -341,4 +369,5 @@ Tested on Flutter 3.35 and 3.50.
 
 ## License
 
-MIT
+MIT. The bundled JetBrains Mono font is under the SIL Open Font License 1.1
+(`fonts/OFL.txt`).

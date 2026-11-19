@@ -138,7 +138,7 @@ void main() {
         StreamingMarkdown(
           controller: controller,
           smoothing: const Smoothing.none(),
-          // the README's Mermaid recipe
+          // a codeBlockBuilder is asked before the built-in diagrams
           codeBlockBuilder: (context, code, language, isComplete) {
             if (language != 'mermaid') return null;
             return Text(isComplete ? 'DIAGRAM ${code.trim()}' : 'drawing…');

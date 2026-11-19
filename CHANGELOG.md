@@ -56,12 +56,20 @@
 * Style presets: `StreamingMarkdownStyle.compact`, `.spacious` and
   `.terminal`.
 * `StreamingMarkdownStyle.blockPadding` pads blocks by tag.
-* `package:llm_markdown/parser.dart`: the parser, healing and plain text
-  without Flutter, for background isolates.
 * A link definition ending in a backslash (`[a]: /b\`) no longer crashes
   the `markdown` package; any other parser error shows the text as it is.
 * Every CommonMark and GitHub spec example is checked to stream exactly like
   a one-shot parse; golden images guard the look.
+* Mermaid flowcharts, sequence diagrams and pie charts are drawn, natively,
+  once their code block is finished (`diagrams`, `MermaidDiagram`).
+* SVG images are drawn (with `flutter_svg`), and `data:` images when that
+  scheme is allowed.
+* Code is set in JetBrains Mono, which now comes with the package
+  (`StreamingMarkdownStyle.codeFont`).
+* `MarkdownSelectionArea` makes replies selectable with a menu of your own
+  actions, without a design library.
+* The parser moved to the pure Dart package `llm_markdown_parser`, for
+  servers and CLIs. `package:llm_markdown/parser.dart` re-exports it.
 
 ## 0.2.0
 
