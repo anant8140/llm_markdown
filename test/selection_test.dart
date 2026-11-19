@@ -77,6 +77,56 @@ void main() {
     expect(copied, 'Streaming markdown rocks.');
   });
 
+  testWidgets('the menu uses the app\'s font, not the overlay\'s', (
+    tester,
+  ) async {
+    // The menu is drawn in the overlay, above the app's own text style.
+    // MaterialApp puts a monospace "error" style there, which showed on
+    // Android.
+    await tester.pumpWidget(
+      WidgetsApp(
+        color: const Color(0xFF2196F3),
+        builder: (context, navigator) => DefaultTextStyle(
+          style: const TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 48,
+            decoration: TextDecoration.underline,
+          ),
+          child: navigator!,
+        ),
+        pageRouteBuilder: <T>(settings, builder) => PageRouteBuilder<T>(
+          pageBuilder: (context, _, _) => builder(context),
+        ),
+        home: const DefaultTextStyle(
+          style: TextStyle(
+            fontSize: 14,
+            color: Color(0xFF202124),
+            fontFamily: 'AppFont',
+            fontFamilyFallback: ['AppFallback'],
+          ),
+          child: Padding(
+            padding: EdgeInsets.only(top: 120),
+            child: MarkdownSelectionArea(
+              child: StreamingMarkdown.text('Streaming markdown rocks.'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.longPressAt(
+      tester.getTopLeft(find.byType(RichText).first) + const Offset(30, 8),
+    );
+    await tester.pumpAndSettle();
+    final shown = tester.widget<RichText>(
+      find.descendant(of: find.text('Copy'), matching: find.byType(RichText)),
+    );
+    final style = shown.text.style!;
+    expect(style.fontFamily, 'AppFont');
+    expect(style.fontFamilyFallback, ['AppFallback']);
+    expect(style.fontSize, 14);
+    expect(style.decoration, TextDecoration.none);
+  });
+
   testWidgets('labels can be translated', (tester) async {
     await tester.pumpWidget(
       _app(

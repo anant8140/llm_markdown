@@ -163,6 +163,9 @@ class _MarkdownSelectionAreaState extends State<MarkdownSelectionArea> {
       anchors: anchors,
       items: items,
       color: widget.menuColor,
+      // The menu is drawn in the overlay, above the app's text style, so
+      // the font is taken from here, where the chat is.
+      font: DefaultTextStyle.of(this.context).style,
       textStyle: widget.menuTextStyle,
       borderRadius: widget.menuBorderRadius,
     );
@@ -195,6 +198,7 @@ class SelectionMenu extends StatelessWidget {
     required this.items,
     required this.color,
     required this.borderRadius,
+    this.font,
     this.textStyle,
   });
 
@@ -202,6 +206,8 @@ class SelectionMenu extends StatelessWidget {
   final List<MarkdownSelectionMenuItem> items;
   final Color color;
   final BorderRadius borderRadius;
+  // the text style where the selection is; only its font is used
+  final TextStyle? font;
   final TextStyle? textStyle;
 
   @override
@@ -212,12 +218,19 @@ class SelectionMenu extends StatelessWidget {
     final below =
         (anchors.secondaryAnchor ?? anchors.primaryAnchor) +
         const Offset(0, 26);
-    final text = const TextStyle(
-      color: Color(0xFFF2F2F2),
+    // inherit: false, because what the overlay would hand down is not the
+    // app's style: under MaterialApp it is a monospace "missing Material"
+    // style, which shows on Android.
+    final text = TextStyle(
+      inherit: false,
+      color: const Color(0xFFF2F2F2),
       fontSize: 14,
       height: 1.2,
       fontWeight: FontWeight.w500,
       decoration: TextDecoration.none,
+      textBaseline: TextBaseline.alphabetic,
+      fontFamily: font?.fontFamily,
+      fontFamilyFallback: font?.fontFamilyFallback,
     ).merge(textStyle);
     return Padding(
       padding: EdgeInsets.fromLTRB(8, top, 8, 8),

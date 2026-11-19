@@ -1,3 +1,8 @@
+## Unreleased
+
+* The menu of `MarkdownSelectionArea` uses the app's font. On Android, in a
+  Material app, it was drawn in a monospace font.
+
 ## 0.4.0
 
 * Following the end of a reply (`autoScrollController`) no longer stops
