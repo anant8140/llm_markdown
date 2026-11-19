@@ -63,7 +63,7 @@
 * Mermaid flowcharts, sequence diagrams and pie charts are drawn, natively,
   once their code block is finished (`diagrams`, `MermaidDiagram`).
 * SVG images are drawn (with `flutter_svg`), and `data:` images when that
-  scheme is allowed.
+  scheme is allowed. A broken or missing SVG shows its alt text.
 * Code is set in JetBrains Mono, which now comes with the package
   (`StreamingMarkdownStyle.codeFont`).
 * `MarkdownSelectionArea` makes replies selectable with a menu of your own

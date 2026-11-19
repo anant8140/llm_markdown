@@ -6,6 +6,7 @@ import 'package:llm_markdown/llm_markdown.dart';
 import 'package:llm_markdown/src/headings.dart';
 import 'package:llm_markdown/src/line_clip.dart';
 import 'package:llm_markdown/src/renderer.dart';
+import 'package:llm_markdown/src/svg_image.dart';
 import 'package:markdown/markdown.dart' as md;
 
 Widget _host(Widget child, {ScrollController? scroll}) => WidgetsApp(
@@ -182,9 +183,44 @@ void main() {
       expect(find.byType(InteractiveViewer), findsNothing);
     });
 
-    testWidgets('SVG pictures are drawn, from an address or inline', (
+    testWidgets('SVG pictures are drawn; broken ones show their alt text', (
       tester,
     ) async {
+      Uri inline(String svg) =>
+          Uri.dataFromString(svg, mimeType: 'image/svg+xml');
+      final good = inline(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20">'
+        '<rect width="40" height="20" fill="#f00"/></svg>',
+      );
+      await tester.pumpWidget(
+        _app(
+          StreamingMarkdown.text(
+            '![Red box]($good)',
+            allowedImageSchemes: const {'https', 'data'},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(tester.getSize(find.byType(SvgPicture)), const Size(40, 20));
+
+      // a file that isn't SVG never reaches the SVG renderer, which in
+      // older versions throws an error that can't be caught
+      await tester.pumpWidget(
+        _app(
+          StreamingMarkdown.text(
+            '![Broken picture](${inline('this is not svg')})',
+            allowedImageSchemes: const {'https', 'data'},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byType(SvgPicture), findsNothing);
+      expect(find.text('Broken picture'), findsOneWidget);
+
+      // by address: .svg goes to the SVG path (tests have no network, so
+      // the download fails), anything else to Image
       await tester.pumpWidget(
         _app(
           const StreamingMarkdown.text(
@@ -193,30 +229,19 @@ void main() {
           ),
         ),
       );
-      expect(find.byType(SvgPicture), findsOneWidget);
+      expect(find.byType(SvgImage), findsOneWidget);
       expect(find.byType(Image), findsOneWidget);
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 200)),
+      );
+      await tester.pump();
+      expect(find.text('Logo'), findsOneWidget);
 
-      final inline = Uri.dataFromString(
-        '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20">'
-        '<rect width="40" height="20" fill="#f00"/></svg>',
-        mimeType: 'image/svg+xml',
-      );
+      // data: is not allowed by default: the alt text shows
       await tester.pumpWidget(
-        _app(
-          StreamingMarkdown.text(
-            '![Red box]($inline)',
-            allowedImageSchemes: const {'https', 'data'},
-          ),
-        ),
+        _app(StreamingMarkdown.text('![Red box]($good)')),
       );
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      expect(tester.getSize(find.byType(SvgPicture)), const Size(40, 20));
-      // not allowed by default: the alt text shows
-      await tester.pumpWidget(
-        _app(StreamingMarkdown.text('![Red box]($inline)')),
-      );
-      expect(find.byType(SvgPicture), findsNothing);
+      expect(find.byType(SvgImage), findsNothing);
     });
 
     testWidgets('zoomImages: false leaves them alone', (tester) async {

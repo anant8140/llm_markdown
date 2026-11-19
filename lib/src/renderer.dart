@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import 'code_block.dart';
@@ -16,6 +15,7 @@ import 'package:llm_markdown_parser/llm_markdown_parser.dart';
 import 'safety.dart';
 import 'thinking.dart';
 import 'style.dart';
+import 'svg_image.dart';
 
 /// Builds a widget for an image, given its address and alternative text.
 typedef MarkdownImageBuilder =
@@ -911,17 +911,12 @@ class _Builder {
           ? data.mimeType == 'image/svg+xml'
           : uri.path.toLowerCase().endsWith('.svg');
       if (svg) {
-        return data != null
-            ? SvgPicture.memory(
-                data.contentAsBytes(),
-                semanticsLabel: alt,
-                errorBuilder: failed,
-              )
-            : SvgPicture.network(
-                uri.toString(),
-                semanticsLabel: alt,
-                errorBuilder: failed,
-              );
+        return SvgImage(
+          uri: data == null ? uri : null,
+          bytes: data?.contentAsBytes(),
+          alt: alt,
+          fallback: (context) => Text(alt ?? '', style: style.textStyle),
+        );
       }
       if (data != null) {
         return Image.memory(
