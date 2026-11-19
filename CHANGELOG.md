@@ -1,4 +1,4 @@
-## Unreleased
+## 0.4.1
 
 * The menu of `MarkdownSelectionArea` uses the app's font. On Android, in a
   Material app, it was drawn in a monospace font.
