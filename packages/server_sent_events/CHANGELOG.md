@@ -1,3 +1,7 @@
+## 0.1.1
+
+* A shorter package description, so search results show all of it.
+
 ## 0.1.0
 
 * `connectSse`: any method, headers and body; `SseException` with the status
