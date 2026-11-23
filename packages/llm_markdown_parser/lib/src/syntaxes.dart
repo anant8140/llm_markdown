@@ -41,8 +41,9 @@ class MarkdownSyntax {
   /// `==highlight==` and `||spoiler||`.
   final bool highlightAndSpoilers;
 
-  /// A small set of HTML tags: `<sub> <sup> <kbd> <mark> <u> <ins> <small>`
-  /// and `<br>`. Other HTML shows as text.
+  /// A small set of HTML tags: `<sub> <sup> <kbd> <mark> <u> <ins> <small>`,
+  /// `<b> <strong> <i> <em> <s> <del> <strike> <code>` and `<br>`, around
+  /// plain text. Other HTML shows as text.
   final bool inlineHtml;
 
   /// `<details><summary>Title</summary> ... </details>` sections.
@@ -186,10 +187,13 @@ class CitationSyntax extends md.InlineSyntax {
   }
 }
 
+// HTML tags that mean the same as a Markdown element.
+const _sameAs = {'b': 'strong', 'i': 'em', 's': 'del', 'strike': 'del'};
+
 class SafeHtmlSyntax extends md.InlineSyntax {
   SafeHtmlSyntax()
     : super(
-        r'<(sub|sup|kbd|mark|u|ins|small)>([^<]*)</\1>|<br\s*/?>',
+        r'<(sub|sup|kbd|mark|u|ins|small|b|strong|i|em|s|del|strike|code)>([^<]*)</\1>|<br\s*/?>',
         caseSensitive: false,
       );
 
@@ -197,7 +201,9 @@ class SafeHtmlSyntax extends md.InlineSyntax {
   bool onMatch(md.InlineParser parser, Match match) {
     final tag = match[1]?.toLowerCase();
     parser.addNode(
-      tag == null ? md.Element.empty('br') : md.Element.text(tag, match[2]!),
+      tag == null
+          ? md.Element.empty('br')
+          : md.Element.text(_sameAs[tag] ?? tag, match[2]!),
     );
     return true;
   }

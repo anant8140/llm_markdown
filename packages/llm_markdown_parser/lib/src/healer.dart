@@ -382,9 +382,9 @@ String _closeDelimiters(String line) {
   return '$trimmed$closers${result.substring(trimmed.length)}';
 }
 
-final RegExp _partialTag = RegExp(r'<(?:/?[A-Za-z][A-Za-z0-9]*[^<>]*)?$');
+final RegExp _partialTag = RegExp(r'<(?:/|/?[A-Za-z][A-Za-z0-9]*[^<>]*)?$');
 final RegExp _openSafeTag = RegExp(
-  r'<(sub|sup|kbd|mark|u|ins|small)>(?![^<]*</\1>)[^<]*$',
+  r'<(sub|sup|kbd|mark|u|ins|small|b|strong|i|em|s|del|strike|code)>(?![^<]*</\1>)[^<]*$',
   caseSensitive: false,
 );
 

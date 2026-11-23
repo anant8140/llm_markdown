@@ -23,19 +23,23 @@ class InlineMathSyntax extends md.InlineSyntax {
   InlineMathSyntax({bool dollar = true})
     : super(
         dollar
-            ? r'\\\((.+?)\\\)'
-                  r'|\$\$(.+?)\$\$'
-                  r'|\\\[(.+?)\\\]'
+            // these three may run over line ends inside a paragraph; a
+            // single $ may not, so that two prices on two lines stay text
+            ? r'\\\(([\s\S]+?)\\\)'
+                  r'|\$\$([\s\S]+?)\$\$'
+                  r'|\\\[([\s\S]+?)\\\]'
                   // not right after a letter or digit: US$5 is a price
                   r'|(?<![\w$])\$(?=[^\s$])((?:\\.|[^$\\\n])+?)(?<=[^\s\\])\$(?!\d)'
             // (?!)() never matches; it keeps the group numbers the same
-            : r'\\\((.+?)\\\)|(?!)()|\\\[(.+?)\\\]',
+            : r'\\\(([\s\S]+?)\\\)|(?!)()|\\\[([\s\S]+?)\\\]',
       );
 
   @override
   bool onMatch(md.InlineParser parser, Match match) {
     final display = match[2] != null || match[3] != null;
-    final tex = (match[1] ?? match[2] ?? match[3] ?? match[4])!.trim();
+    final tex = (match[1] ?? match[2] ?? match[3] ?? match[4])!
+        .replaceAll(RegExp(r'\s*\n\s*'), ' ')
+        .trim();
     parser.addNode(
       md.Element.text(inlineMathTag, tex)..attributes['display'] = '$display',
     );
