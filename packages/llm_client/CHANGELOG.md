@@ -1,3 +1,9 @@
+## 0.1.1
+
+* Checked against a real Ollama server, through its own API and its
+  OpenAI-compatible endpoint; the README says what was checked.
+  `tool/live_ollama.dart` runs the checks. No code change.
+
 ## 0.1.0
 
 * First release: `OpenAIProvider` (Chat Completions and compatible

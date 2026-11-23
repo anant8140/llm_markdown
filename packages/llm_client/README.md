@@ -239,11 +239,27 @@ For Ollama, give the lines with `FakeSseResponse.raw(['{...}\n', ...])`.
 To test your own code without any wire format, extend `LlmProvider` and
 return the events you want from `stream`.
 
-## Not verified against live APIs
+## What has been checked against a real server
 
-This version was written from the providers' published wire formats and
-is tested only against fake responses built from them. No request has
-been sent to a real API yet. In particular, these have not been checked
+**Ollama 0.40** with a local model (`qwen3.6:27b`), through Ollama's own
+API with `OllamaProvider` and through its OpenAI-compatible endpoint with
+`OpenAIProvider(baseUrl: 'http://localhost:11434/v1')`:
+
+- text in several deltas, the finish reason and token usage;
+- thinking deltas, kept apart from the text;
+- a tool call (start, delta, done, arguments as a map), and the round trip
+  with the tool's result, including `tool_name` and the call's `id`;
+- cancelling in the middle, after which the server answers again at once;
+- an unknown model as an `LlmException` with status 404, and a server that
+  is not there as an error.
+
+`dart run tool/live_ollama.dart [--openai] [model]` runs these checks.
+
+The OpenAI wire format is therefore checked against one real server, with
+`max_completion_tokens`, `stream_options` and streamed tool calls. OpenAI's
+own API, Anthropic and Gemini have not been called yet: those providers
+were written from the published wire formats and are tested against fake
+responses built from them. In particular, these have not been checked
 live:
 
 - **OpenAI:** `max_completion_tokens` and `stream_options` on compatible
@@ -257,8 +273,8 @@ live:
   3 models, and that sending them back as `providerData` satisfies the
   API. Signatures on parts that are not function calls are dropped.
   `outputTokens` adds `thoughtsTokenCount` to `candidatesTokenCount`.
-- **Ollama:** `tool_name` on tool messages, the `id` of tool calls and
-  `message.thinking`, which only newer versions have.
+- **Ollama:** versions before 0.40, which may not send `message.thinking`
+  or tool-call ids.
 - **Finish reasons:** Gemini and Ollama report a plain stop when the model
   called tools; this package reports `toolCalls` when the reply had any.
   Reasons without a matching name are `LlmFinishReason.other`, with the

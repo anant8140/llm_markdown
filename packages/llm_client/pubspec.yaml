@@ -2,7 +2,7 @@ name: llm_client
 description: >-
   One typed API for streaming chat with OpenAI, Anthropic, Gemini and
   Ollama: text, thinking, tool calls, usage, errors and cancel. Pure Dart.
-version: 0.1.0
+version: 0.1.1
 repository: https://github.com/anant8140/llm_markdown/tree/main/packages/llm_client
 issue_tracker: https://github.com/anant8140/llm_markdown/issues
 topics:
