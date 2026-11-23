@@ -1,0 +1,30 @@
+name: llm_client_ai_toolkit
+description: >-
+  Use OpenAI, Anthropic, Gemini and Ollama in the Flutter AI Toolkit's
+  LlmChatView: an LlmProvider backed by llm_client.
+version: 0.1.0
+repository: https://github.com/anant8140/llm_markdown/tree/main/packages/llm_client_ai_toolkit
+issue_tracker: https://github.com/anant8140/llm_markdown/issues
+topics:
+  - ai
+  - llm
+  - openai
+  - anthropic
+  - chat
+
+environment:
+  sdk: ^3.13.0
+  flutter: ">=3.47.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_ai_toolkit: ^1.2.0
+  llm_client: ^0.1.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+  material_ui: ^1.11.1
+  server_sent_events: ^0.2.0
