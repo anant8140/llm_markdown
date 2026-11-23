@@ -44,8 +44,18 @@ StreamingMarkdown(controller: controller)
 A stop button only needs `controller.complete()`.
 
 If you use Google Search grounding, Google's terms ask you to show the
-search suggestions it returns (`groundingMetadata.searchEntryPoint`); this
-package shows the cited pages, not that widget.
+search suggestions it returns. `onSearchSuggestions` hands you their HTML,
+to show in a web view under the reply:
+
+```dart
+controller.addFirebaseAIStream(
+  stream,
+  onSearchSuggestions: (html) => setState(() => _suggestionsHtml = html),
+);
+```
+
+Code the model runs with the code execution tool, and its output, are added
+to the reply as code blocks; `showCodeExecution: false` leaves them out.
 
 ## With the Flutter AI Toolkit
 

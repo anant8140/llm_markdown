@@ -1,7 +1,7 @@
 name: llm_markdown_firebase_ai
 description: >-
   Streams Firebase AI Logic (firebase_ai) Gemini replies into llm_markdown, with thinking, function calls and Google Search sources.
-version: 0.1.2
+version: 0.2.0
 repository: https://github.com/anant8140/llm_markdown/tree/main/packages/llm_markdown_firebase_ai
 issue_tracker: https://github.com/anant8140/llm_markdown/issues
 screenshots:

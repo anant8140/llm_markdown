@@ -1,3 +1,10 @@
+## 0.2.0
+
+* Code the model ran with the code execution tool, and its output, are added
+  to the reply as code blocks (`showCodeExecution`).
+* `onSearchSuggestions` hands over the HTML of the Google Search
+  suggestions of a grounded reply, which Google's terms ask apps to show.
+
 ## 0.1.2
 
 * An animation and a screenshot of a reply with thinking, a search call and

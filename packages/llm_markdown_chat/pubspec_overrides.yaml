@@ -5,3 +5,7 @@ dependency_overrides:
     path: ../..
   llm_markdown_parser:
     path: ../llm_markdown_parser
+  server_sent_events:
+    path: ../server_sent_events
+  partial_json:
+    path: ../partial_json

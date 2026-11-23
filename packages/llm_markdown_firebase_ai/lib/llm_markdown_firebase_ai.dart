@@ -27,7 +27,20 @@ extension FirebaseAIStreams on StreamingMarkdownController {
   /// [ModelStreamError], as does an error in [responses]; the error is then
   /// rethrown. Calling [reset] or [complete] meanwhile (a stop button) stops
   /// reading at once and cancels [responses], which closes the request.
-  Future<void> addFirebaseAIStream(Stream<GenerateContentResponse> responses) {
+  ///
+  /// With [showCodeExecution], code the model ran with the code execution
+  /// tool, and its output, are added to the reply as code blocks.
+  ///
+  /// [onSearchSuggestions] is called with the HTML of the Google Search
+  /// suggestions of a grounded reply (`searchEntryPoint.renderedContent`),
+  /// once for each different one. Google's terms ask apps that use Search
+  /// grounding to show it, for example in a web view under the reply.
+  Future<void> addFirebaseAIStream(
+    Stream<GenerateContentResponse> responses, {
+    bool showCodeExecution = true,
+    void Function(String html)? onSearchSuggestions,
+  }) {
+    String? suggestions;
     // already stopped, for example while waiting for the first response
     if (isComplete) {
       unawaited(responses.listen(null).cancel());
@@ -88,8 +101,23 @@ extension FirebaseAIStreams on StreamingMarkdownController {
           addSource(MarkdownSource(url: place.uri, title: place.title));
         }
       }
+      final html =
+          candidate.groundingMetadata?.searchEntryPoint?.renderedContent;
+      if (html != null && html.isNotEmpty && html != suggestions) {
+        suggestions = html;
+        onSearchSuggestions?.call(html);
+      }
       for (final part in candidate.content.parts) {
         switch (part) {
+          case ExecutableCodePart(:final language, :final code):
+            if (showCodeExecution && code.isNotEmpty) {
+              final name = language.toJson().toString().toLowerCase();
+              append(_codeBlock(code, name == 'python' ? name : ''));
+            }
+          case CodeExecutionResultPart(:final output):
+            if (showCodeExecution && output.isNotEmpty) {
+              append(_codeBlock(output, 'text'));
+            }
           case FunctionCall(:final id, :final name, :final args):
             final key = id ?? 'call_${calls++}';
             startToolCall(key, name);
@@ -145,6 +173,18 @@ extension FirebaseAIStreams on StreamingMarkdownController {
     'tooManyToolCalls',
     'malformedResponse',
   };
+
+  // A fenced code block on its own lines, with a fence longer than any
+  // run of backticks inside.
+  static String _codeBlock(String code, String language) {
+    var longest = 0;
+    for (final run in RegExp('`+').allMatches(code)) {
+      if (run.end - run.start > longest) longest = run.end - run.start;
+    }
+    final fence = '`' * (longest < 3 ? 3 : longest + 1);
+    final body = code.endsWith('\n') ? code : '$code\n';
+    return '\n\n$fence$language\n$body$fence\n\n';
+  }
 
   static String _blocked(String reason, String? message) =>
       'Blocked: $reason'

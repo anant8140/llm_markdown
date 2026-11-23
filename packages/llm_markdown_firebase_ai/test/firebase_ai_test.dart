@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:firebase_ai/firebase_ai.dart';
 // not exported by firebase_ai; responses carry it, tests build it
 // ignore: implementation_imports
-import 'package:firebase_ai/src/api.dart' show GroundingMetadata;
+import 'package:firebase_ai/src/api.dart'
+    show CodeLanguage, GroundingMetadata, Outcome, SearchEntryPoint;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:llm_markdown/llm_markdown.dart';
 import 'package:llm_markdown_firebase_ai/llm_markdown_firebase_ai.dart';
@@ -12,6 +13,7 @@ GenerateContentResponse _reply(
   List<Part> parts, {
   FinishReason? finish,
   List<GroundingChunk>? sources,
+  String? suggestions,
 }) => GenerateContentResponse([
   Candidate(
     Content('model', parts),
@@ -19,10 +21,13 @@ GenerateContentResponse _reply(
     null,
     finish,
     null,
-    groundingMetadata: sources == null
+    groundingMetadata: sources == null && suggestions == null
         ? null
         : GroundingMetadata(
-            groundingChunks: sources,
+            searchEntryPoint: suggestions == null
+                ? null
+                : SearchEntryPoint(renderedContent: suggestions),
+            groundingChunks: sources ?? const [],
             groundingSupports: const [],
             webSearchQueries: const [],
           ),
@@ -76,6 +81,48 @@ void main() {
       expect(controller.sources.single.title, 'Dart');
     },
   );
+
+  test('code the model ran, and its output, become code blocks', () async {
+    final parts = [
+      const TextPart('Let me compute.'),
+      ExecutableCodePart(language: CodeLanguage.python, code: 'print(2 ** 10)'),
+      CodeExecutionResultPart(outcome: Outcome.ok, output: 'a ``` b\n'),
+      const TextPart('It is 1024.'),
+    ];
+    final controller = StreamingMarkdownController();
+    addTearDown(controller.dispose);
+    await controller.addFirebaseAIStream(Stream.value(_reply(parts)));
+    expect(
+      controller.text,
+      'Let me compute.\n\n```python\nprint(2 ** 10)\n```\n\n'
+      '\n\n````text\na ``` b\n````\n\nIt is 1024.',
+    );
+
+    final hidden = StreamingMarkdownController();
+    addTearDown(hidden.dispose);
+    await hidden.addFirebaseAIStream(
+      Stream.value(_reply(parts)),
+      showCodeExecution: false,
+    );
+    expect(hidden.text, 'Let me compute.It is 1024.');
+  });
+
+  test('search suggestions are handed over once per different one', () async {
+    final seen = <String>[];
+    final controller = StreamingMarkdownController();
+    addTearDown(controller.dispose);
+    await controller.addFirebaseAIStream(
+      Stream.fromIterable([
+        _reply([const TextPart('a')], suggestions: '<div>one</div>'),
+        _reply([const TextPart('b')], suggestions: '<div>one</div>'),
+        _reply([const TextPart('c')], suggestions: ''),
+        _reply([const TextPart('d')], suggestions: '<div>two</div>'),
+      ]),
+      onSearchSuggestions: seen.add,
+    );
+    expect(seen, ['<div>one</div>', '<div>two</div>']);
+    expect(controller.text, 'abcd');
+  });
 
   test('a blocked prompt ends the reply with an error', () async {
     final controller = StreamingMarkdownController();
