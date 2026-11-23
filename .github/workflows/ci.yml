@@ -39,6 +39,36 @@ jobs:
           dart pub get
           dart analyze
           dart test -p vm,chrome
+      - name: llm_client package (pure Dart, VM and Chrome)
+        working-directory: packages/llm_client
+        run: |
+          dart pub get
+          dart analyze
+          dart test -p vm,chrome
+      - name: SSE widgets package
+        working-directory: packages/server_sent_events_flutter
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: llm_markdown_client package
+        working-directory: packages/llm_markdown_client
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Structured UI package
+        working-directory: packages/llm_structured_ui
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: AI Toolkit provider package
+        working-directory: packages/llm_client_ai_toolkit
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
       - name: Firebase AI package
         working-directory: packages/llm_markdown_firebase_ai
         run: |
