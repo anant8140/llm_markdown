@@ -17,9 +17,9 @@ parsePartialJson('{"title": "Streaming", "tags": ["a", "b');
   key shows once its value has started. Escapes and emoji cut in half wait
   for their other half.
 - **Incremental:** `PartialJsonParser` reads each piece once, so a long
-  reply costs no more than parsing it whole. A 157 KB document in 20,000
-  pieces took 26 ms, against about 50 s for parsing the text so far again
-  after every piece.
+  reply costs no more than parsing it whole: a 77 KB document in about
+  10,000 pieces takes 7 ms, against about 21 s for parsing the text so far
+  again after every piece (see Performance).
 - **Knows what is finished:** `pendingPath` is the path of the value still
   being written, like `['items', 2, 'title']`; everything else is final.
 - **Made for model output:** by default text around the JSON is skipped, so
@@ -69,6 +69,16 @@ textStream
       convert: (json) => Recipe.fromJson(json as Map<String, dynamic>),
     ))
     .listen((recipe) => setState(() => recipes.add(recipe)));
+```
+
+A `'*'` in a path stands for any key or index. `PartialJsonValueDecoder`
+gives single values the same way:
+
+```dart
+textStream.transform(PartialJsonValueDecoder(
+  pattern: ['recipes', '*', 'name'],
+  convert: (json, path) => json as String,
+)); // each recipe's name as soon as it is written
 ```
 
 `onComplete` gives the same for every value: `PartialJsonParser(onComplete:
@@ -126,6 +136,23 @@ Errors are `FormatException`s naming the line and column, with the offset.
 `PartialJsonParser(lenient: false)` accepts only JSON: nothing around the
 document, no trailing comma, and any value at the root, including a
 number, which completes at `close()`.
+
+## Performance
+
+A document streamed in pieces of 8 characters, the value read after every
+piece (`dart run benchmark/bench.dart`, median of 5 runs, Apple Silicon
+Mac, Dart 3.14 JIT):
+
+| document | pieces | `PartialJsonParser` | parsing the text so far again after every piece | `jsonDecode`, once at the end |
+| --- | --- | --- | --- | --- |
+| 19 KB | 2,459 | 1.9 ms | 1,292 ms | 0.2 ms |
+| 77 KB | 9,912 | 7.4 ms | about 21 s | 0.5 ms |
+| 316 KB | 40,474 | 31.7 ms | about 417 s | 1.6 ms |
+
+The parser's time grows with the size of the document; parsing again each
+time grows with its square. `jsonDecode` is faster for a document you
+already have whole, and can't read one that is cut off. The two larger
+"again" figures are measured on every 20th piece and multiplied.
 
 ## With other packages
 

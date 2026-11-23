@@ -158,6 +158,19 @@ final events = connectSse(url, client: fake);
 final events = response.stream.transform(const SseDecoder());
 ```
 
+## Compared with flutter_client_sse
+
+Run against the same local server ([the test and how to run
+it](https://github.com/anant8140/llm_markdown/tree/main/packages/server_sent_events/benchmark)):
+
+| | server_sent_events | flutter_client_sse 2.0.3 |
+| --- | --- | --- |
+| `data: hello` | `hello` | ` hello\n` |
+| the server ends the stream | the stream ends | the stream stays open |
+| a 401 with a JSON error body | `SseException` with the status and body | no error; retries every 5 s |
+| cancelling the subscription | closes the connection | the connection stays open |
+| 50,000 events | 247–342 ms | 273–315 ms |
+
 ## With llm_markdown
 
 The replies are Markdown; [llm_markdown](https://pub.dev/packages/llm_markdown)

@@ -187,6 +187,51 @@ void main() {
     expect(watch.elapsed, greaterThan(const Duration(milliseconds: 900)));
   });
 
+  test('waitBefore: grows, is capped, varies by jitter, obeys the server', () {
+    const policy = SseReconnect(
+      delay: Duration(seconds: 1),
+      maxDelay: Duration(seconds: 5),
+      jitter: 0.5,
+    );
+    Duration wait(
+      int failures,
+      double roll, {
+      Duration? server,
+      Duration? after,
+    }) => policy.waitBefore(
+      failures,
+      serverDelay: server,
+      retryAfter: after,
+      random: _Fixed(roll),
+    );
+    // a roll of 0.5 is the middle: no change
+    expect(wait(0, 0.5), const Duration(seconds: 1));
+    expect(wait(1, 0.5), const Duration(seconds: 2));
+    expect(wait(2, 0.5), const Duration(seconds: 4));
+    expect(wait(3, 0.5), const Duration(seconds: 5)); // capped
+    // the ends of the range: half shorter, half longer
+    expect(wait(0, 0), const Duration(milliseconds: 500));
+    expect(wait(1, 1), const Duration(seconds: 3));
+    // the server's retry: replaces the delay; Retry-After is a minimum
+    expect(
+      wait(0, 0.5, server: const Duration(seconds: 3)),
+      const Duration(seconds: 3),
+    );
+    expect(
+      wait(0, 0.5, after: const Duration(seconds: 9)),
+      const Duration(seconds: 9),
+    );
+    expect(
+      wait(0, 0.5, after: const Duration(milliseconds: 1)),
+      const Duration(seconds: 1),
+    );
+    // without jitter the random is not used
+    expect(
+      const SseReconnect(jitter: 0).waitBefore(1, random: _Fixed(0)),
+      const Duration(seconds: 2),
+    );
+  });
+
   test('maxEventSize ends a too large event without retrying', () async {
     final fake = FakeSseClient(
       (_) => FakeSseResponse.raw([
@@ -460,6 +505,17 @@ void main() {
       expect(fake.bodies.single, '{"q":1}');
     },
   );
+}
+
+class _Fixed implements Random {
+  _Fixed(this.roll);
+  final double roll;
+  @override
+  double nextDouble() => roll;
+  @override
+  bool nextBool() => false;
+  @override
+  int nextInt(int max) => 0;
 }
 
 extension on SseEvent {

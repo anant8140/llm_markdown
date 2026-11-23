@@ -52,6 +52,30 @@ class SseReconnect {
 
   /// Whether a stream the server ended normally is opened again.
   final bool onClose;
+
+  /// How long to wait before reconnecting after [failures] failed attempts
+  /// in a row (0 for the first): [serverDelay], the server's `retry:` time,
+  /// or else [delay], times [factor] for each failure, at most [maxDelay],
+  /// varied by [jitter] with [random], and never shorter than
+  /// [retryAfter], the server's `Retry-After`.
+  Duration waitBefore(
+    int failures, {
+    Duration? serverDelay,
+    Duration? retryAfter,
+    Random? random,
+  }) {
+    var pause = serverDelay ?? delay;
+    for (var i = 0; i < failures; i++) {
+      pause *= factor;
+    }
+    if (pause > maxDelay) pause = maxDelay;
+    if (jitter > 0) {
+      final roll = (random ?? Random()).nextDouble();
+      pause *= 1 + (roll * 2 - 1) * jitter;
+    }
+    if (retryAfter != null && retryAfter > pause) pause = retryAfter;
+    return pause;
+  }
 }
 
 /// The state of an event stream's connection, for showing it in an app.
@@ -273,17 +297,13 @@ class _Connection {
       _close(error, stackTrace);
       return;
     }
-    var pause = serverDelay ?? policy.delay;
-    for (var i = 0; i < failures; i++) {
-      pause *= policy.factor;
-    }
-    if (pause > policy.maxDelay) pause = policy.maxDelay;
-    if (policy.jitter > 0) {
-      pause *= 1 + (_random.nextDouble() * 2 - 1) * policy.jitter;
-    }
-    final after = retryAfter;
+    final pause = policy.waitBefore(
+      failures,
+      serverDelay: serverDelay,
+      retryAfter: retryAfter,
+      random: _random,
+    );
     retryAfter = null;
-    if (after != null && after > pause) pause = after;
     failures++;
     _status(SseStatus.reconnecting);
     wait = Timer(pause, _open);

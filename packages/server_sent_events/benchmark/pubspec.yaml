@@ -1,0 +1,19 @@
+name: sse_compare
+description: Compares server_sent_events with flutter_client_sse against one local server.
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.35.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_client_sse: ^2.0.3
+  server_sent_events:
+    path: ..
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

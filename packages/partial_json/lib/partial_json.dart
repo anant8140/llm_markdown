@@ -13,4 +13,6 @@ export 'src/streams.dart'
         PartialJsonDocument,
         PartialJsonDocumentsDecoder,
         PartialJsonItemDecoder,
-        ToolArgumentsParser;
+        PartialJsonValueDecoder,
+        ToolArgumentsParser,
+        jsonPathMatches;

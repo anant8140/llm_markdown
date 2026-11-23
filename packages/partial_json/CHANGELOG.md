@@ -3,6 +3,8 @@
 * `onComplete(path, value)`: told when each value is finished.
 * `PartialJsonItemDecoder`: each item of a list, converted, as soon as it is
   finished.
+* `PartialJsonValueDecoder` and `jsonPathMatches`: values by path, with
+  `'*'` for any key or index.
 * `snapshot()` and `PartialJsonDecoder(snapshots: true)`: copies that later
   pieces leave alone.
 * `changedPaths`: what the last piece started, changed or finished.

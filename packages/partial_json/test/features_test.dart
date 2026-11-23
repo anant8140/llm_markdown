@@ -214,6 +214,39 @@ void main() {
     ]);
   });
 
+  test('wildcard paths', () async {
+    expect(jsonPathMatches(['a', 2, 'n'], ['a', '*', 'n']), isTrue);
+    expect(jsonPathMatches(['a', 2, 'm'], ['a', '*', 'n']), isFalse);
+    expect(jsonPathMatches(['a', 2], ['a', '*', 'n']), isFalse);
+    expect(jsonPathMatches(['a', 2, 'n', 0], ['a', '*', 'n']), isFalse);
+    expect(jsonPathMatches([], []), isTrue);
+
+    const chunks = [
+      '{"recipes": [{"name": "So',
+      'up", "tags": ["hot"]}, {"name": "Pie", "tags": ["a", "b"]}], ',
+      '"other": {"name": "no"}}',
+    ];
+    final names = await Stream.fromIterable(chunks)
+        .transform(
+          PartialJsonValueDecoder(
+            pattern: const ['recipes', '*', 'name'],
+            convert: (json, path) => '${path[1]}:$json',
+          ),
+        )
+        .toList();
+    expect(names, ['0:Soup', '1:Pie']);
+
+    final tags = await Stream.fromIterable(chunks)
+        .transform(
+          PartialJsonItemDecoder(
+            path: const ['recipes', '*', 'tags'],
+            convert: (json) => json,
+          ),
+        )
+        .toList();
+    expect(tags, ['hot', 'a', 'b']);
+  });
+
   test('PartialJsonDocumentsDecoder reads JSON Lines', () async {
     final docs =
         await Stream.fromIterable(['{"a": 1}\n{"b": ', '2}\n', '[3]\n{"c": "x'])

@@ -57,7 +57,9 @@ class PartialJsonItemDecoder<T> extends StreamTransformerBase<String, T> {
     this.repair = false,
   });
 
-  /// The path of the list, such as `['data', 'items']`.
+  /// The path of the list, such as `['data', 'items']`; `'*'` stands for
+  /// any key or index, so `['days', '*', 'meals']` gives the meals of
+  /// every day.
   final List<Object> path;
 
   /// Makes an item from its JSON value.
@@ -94,11 +96,64 @@ class PartialJsonItemDecoder<T> extends StreamTransformerBase<String, T> {
     }
   }
 
-  bool _starts(List<Object> at) {
-    for (var i = 0; i < path.length; i++) {
-      if (at[i] != path[i]) return false;
+  bool _starts(List<Object> at) =>
+      jsonPathMatches(at.sublist(0, path.length), path);
+}
+
+/// Whether [path], as [PartialJsonParser] reports it, fits [pattern]: the
+/// same length, and each part equal or matched by `'*'`, which stands for
+/// any key or index. `['recipes', 2, 'name']` fits `['recipes', '*',
+/// 'name']`.
+bool jsonPathMatches(List<Object> path, List<Object> pattern) {
+  if (path.length != pattern.length) return false;
+  for (var i = 0; i < path.length; i++) {
+    if (pattern[i] != '*' && pattern[i] != path[i]) return false;
+  }
+  return true;
+}
+
+/// Gives every finished value whose path fits [pattern], converted with
+/// [convert]: with `['recipes', '*', 'name']`, the name of each recipe as
+/// soon as that name is written.
+class PartialJsonValueDecoder<T> extends StreamTransformerBase<String, T> {
+  /// A decoder of the values at [pattern]; `'*'` stands for any key or
+  /// index, see [jsonPathMatches].
+  const PartialJsonValueDecoder({
+    required this.pattern,
+    required this.convert,
+    this.lenient = true,
+    this.repair = false,
+  });
+
+  /// The paths to give, such as `['recipes', '*', 'name']`.
+  final List<Object> pattern;
+
+  /// Makes a result from a value and the path it was found at.
+  final T Function(Object? json, List<Object> path) convert;
+
+  /// Whether text around the document and trailing commas are allowed.
+  final bool lenient;
+
+  /// Whether common mistakes in model JSON are read anyway.
+  final bool repair;
+
+  @override
+  Stream<T> bind(Stream<String> stream) async* {
+    final found = <T>[];
+    final parser = PartialJsonParser(
+      lenient: lenient,
+      repair: repair,
+      onComplete: (at, value) {
+        if (jsonPathMatches(at, pattern)) found.add(convert(value, at));
+      },
+    );
+    await for (final chunk in stream) {
+      parser.add(chunk);
+      yield* Stream.fromIterable(found.toList());
+      found.clear();
     }
-    return true;
+    parser.close();
+    yield* Stream.fromIterable(found.toList());
   }
 }
 
