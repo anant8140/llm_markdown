@@ -1,5 +1,6 @@
-# Builds the example app for the web and publishes it on GitHub Pages:
-# https://anant8140.github.io/llm_markdown/
+# Builds the example apps for the web and publishes them on GitHub Pages:
+# https://anant8140.github.io/llm_markdown/ and, for llm_markdown_chat,
+# https://anant8140.github.io/llm_markdown/chat/
 name: Web demo
 
 on:
@@ -31,6 +32,12 @@ jobs:
         run: |
           flutter pub get
           flutter build web --release --base-href /llm_markdown/
+      - name: Build the chat example
+        working-directory: packages/llm_markdown_chat/example
+        run: |
+          flutter pub get
+          flutter build web --release --base-href /llm_markdown/chat/
+          cp -R build/web ../../../example/build/web/chat
       - uses: actions/upload-pages-artifact@v3
         with:
           path: example/build/web

@@ -14,6 +14,11 @@ for AI chat replies that stream in.
 - Calling `reset()` or `complete()` (a stop button) cancels the request at
   once.
 
+<img src="https://raw.githubusercontent.com/anant8140/llm_markdown/main/packages/llm_markdown_firebase_ai/doc/firebase_ai.gif" width="320" alt="A Gemini reply with thinking, a search and sources">
+
+The sources are in `controller.sources`; the app shows them its own way,
+as the chips above.
+
 Works with `firebase_ai` 3.15 and later, including the version
 `flutter_ai_toolkit` uses.
 

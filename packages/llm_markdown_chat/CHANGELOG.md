@@ -1,3 +1,8 @@
+## 0.1.1
+
+* Screenshots, an animation of a reply streaming in, and a
+  [live demo](https://anant8140.github.io/llm_markdown/chat/).
+
 ## 0.1.0
 
 * `LlmChatController`: messages, `send`, `stop`, `retry`, `clear`, and an

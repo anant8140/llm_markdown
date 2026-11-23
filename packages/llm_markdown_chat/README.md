@@ -16,6 +16,11 @@ Markdown without flicker, with code, tables, math and diagrams.
   with the OpenAI, Anthropic, Gemini, Ollama or Firebase AI adapters of
   `llm_markdown`
 
+**[Try it in the browser](https://anant8140.github.io/llm_markdown/chat/)**
+(a pretend model, no key needed)
+
+<img src="https://raw.githubusercontent.com/anant8140/llm_markdown/main/packages/llm_markdown_chat/doc/chat.gif" width="320" alt="A reply streaming into the chat">
+
 ## Usage
 
 ```dart

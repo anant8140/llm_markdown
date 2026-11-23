@@ -1,3 +1,8 @@
+## 0.1.2
+
+* An animation and a screenshot of a reply with thinking, a search call and
+  sources.
+
 ## 0.1.1
 
 * A reply stopped before the first response arrives cancels the request
