@@ -1,0 +1,9 @@
+# The packages this one builds on live in this repository too; work on them
+# together. Not published (see .pubignore).
+dependency_overrides:
+  llm_markdown:
+    path: ../..
+  llm_markdown_parser:
+    path: ../llm_markdown_parser
+  partial_json:
+    path: ../partial_json

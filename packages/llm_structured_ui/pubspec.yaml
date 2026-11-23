@@ -1,0 +1,28 @@
+name: llm_structured_ui
+description: >-
+  Flutter widgets that show an AI model's structured JSON output while it
+  streams in: text, lists, field tables and cards that fill in as they arrive.
+version: 0.1.0
+repository: https://github.com/anant8140/llm_markdown/tree/main/packages/llm_structured_ui
+issue_tracker: https://github.com/anant8140/llm_markdown/issues
+topics:
+  - ai
+  - llm
+  - json
+  - streaming
+  - widget
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.35.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  llm_markdown: ">=0.6.1 <0.8.0"
+  partial_json: ^0.2.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

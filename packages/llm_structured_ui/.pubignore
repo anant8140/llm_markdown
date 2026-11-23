@@ -1,0 +1,7 @@
+pubspec_overrides.yaml
+
+# A .pubignore replaces the .gitignore next to it, so its rules are repeated
+# here.
+.dart_tool/
+build/
+pubspec.lock
