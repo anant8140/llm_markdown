@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
@@ -240,21 +241,50 @@ class StreamingMarkdownController extends ChangeNotifier {
 
   /// Appends every chunk of [stream] and completes when it is done.
   ///
-  /// Stops early, without completing, if [reset] is called meanwhile. An
-  /// error in [stream] ends the reply with [completeWithError] and is then
-  /// rethrown.
-  Future<void> addStream(Stream<String> stream) async {
-    final generation = _generation;
-    try {
-      await for (final chunk in stream) {
-        if (_generation != generation) return;
-        append(chunk);
+  /// Stops at once, without completing, if [reset] is called meanwhile, and
+  /// also if [complete] is (a stop button): [stream] is then cancelled,
+  /// which closes the request behind it. An error in [stream] ends the
+  /// reply with [completeWithError] and is then rethrown.
+  Future<void> addStream(Stream<String> stream) {
+    final started = _generation;
+    final done = Completer<void>();
+    late final StreamSubscription<String> subscription;
+    late final VoidCallback watch;
+
+    void finish([Object? error, StackTrace? stackTrace]) {
+      if (done.isCompleted) return;
+      removeListener(watch);
+      unawaited(subscription.cancel());
+      if (error == null) {
+        done.complete();
+      } else {
+        done.completeError(error, stackTrace);
       }
-    } on Object catch (error, stackTrace) {
-      if (_generation == generation) completeWithError(error, stackTrace);
-      rethrow;
     }
-    if (_generation == generation) complete();
+
+    watch = () {
+      if (_generation != started || _isComplete) finish();
+    };
+    subscription = stream.listen(
+      (chunk) {
+        if (!done.isCompleted) append(chunk);
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (done.isCompleted) return;
+        removeListener(watch);
+        if (_generation == started) completeWithError(error, stackTrace);
+        finish(error, stackTrace);
+      },
+      onDone: () {
+        if (done.isCompleted) return;
+        removeListener(watch);
+        if (_generation == started) complete();
+        finish();
+      },
+      cancelOnError: true,
+    );
+    addListener(watch);
+    return done.future;
   }
 }
 

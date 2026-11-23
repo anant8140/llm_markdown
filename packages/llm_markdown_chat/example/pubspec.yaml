@@ -1,0 +1,16 @@
+name: llm_markdown_chat_example
+description: A chat screen with a pretend model.
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  llm_markdown: ^0.6.1
+  llm_markdown_chat:
+    path: ..
+
+dev_dependencies:
+  flutter_lints: ^6.0.0

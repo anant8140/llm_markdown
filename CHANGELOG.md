@@ -1,3 +1,12 @@
+## 0.6.1
+
+* `addStream` stops at once when the reply is completed (a stop button) or
+  reset, and cancels the stream, which closes the request behind it; it
+  used to wait for the next chunk and to keep reading after `complete`.
+* New companion package
+  [llm_markdown_chat](https://pub.dev/packages/llm_markdown_chat): a ready
+  chat screen with message list, input, send and stop, copy and try again.
+
 ## 0.6.0
 
 * `StreamingMarkdown.text` takes `completeAfter`: for a text that grows but

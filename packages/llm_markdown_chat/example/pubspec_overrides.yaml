@@ -1,0 +1,5 @@
+dependency_overrides:
+  llm_markdown:
+    path: ../../..
+  llm_markdown_parser:
+    path: ../../llm_markdown_parser

@@ -201,6 +201,23 @@ await controller.addOllamaStream(response.stream); // /api/chat or /api/generate
 providers, such as Ollama's `/v1/chat/completions`, OpenRouter, Groq and
 DeepSeek.
 
+### A whole chat screen
+
+[llm_markdown_chat](https://pub.dev/packages/llm_markdown_chat) gives the
+screen around the replies: message list, input box, send and stop, copy
+and try again, with any model:
+
+```dart
+final chat = LlmChatController(
+  onReply: (prompt, reply, history) async {
+    final response = await client.send(buildRequest(history, prompt));
+    await reply.addOpenAIStream(response.stream);
+  },
+);
+
+LlmChatView(controller: chat)
+```
+
 ### Firebase AI and the Flutter AI Toolkit
 
 With Firebase AI Logic (`firebase_ai`), add
@@ -428,6 +445,12 @@ incremental parser, `healIncompleteMarkdown`, `markdownToPlainText`,
 `splitThinking` and `serverSentEvents`. Use it on a server, in a CLI or in
 an isolate. From a Flutter app, `package:llm_markdown/parser.dart` gives the
 same thing.
+
+Two more pure Dart packages from this repository go well with it:
+[server_sent_events](https://pub.dev/packages/server_sent_events), an SSE
+client for AI APIs (POST, cancel, reconnect, web), and
+[partial_json](https://pub.dev/packages/partial_json), which parses JSON
+while it streams in, for structured output and tool arguments.
 
 ## Coming from flutter_markdown
 

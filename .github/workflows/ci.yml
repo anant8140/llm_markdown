@@ -27,6 +27,18 @@ jobs:
           dart pub get
           dart analyze
           dart test
+      - name: SSE package (pure Dart, VM and Chrome)
+        working-directory: packages/server_sent_events
+        run: |
+          dart pub get
+          dart analyze
+          dart test -p vm,chrome
+      - name: partial_json package (pure Dart, VM and Chrome)
+        working-directory: packages/partial_json
+        run: |
+          dart pub get
+          dart analyze
+          dart test -p vm,chrome
       - name: Firebase AI package
         working-directory: packages/llm_markdown_firebase_ai
         run: |
@@ -34,6 +46,14 @@ jobs:
           dart format --output=none --set-exit-if-changed .
           flutter analyze
           flutter test
+      - name: Chat package
+        working-directory: packages/llm_markdown_chat
+        run: |
+          flutter pub get
+          dart format --output=none --set-exit-if-changed .
+          flutter analyze
+          flutter test
+          cd example && flutter pub get && flutter analyze
       - name: Example
         working-directory: example
         run: |

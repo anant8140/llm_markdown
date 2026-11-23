@@ -2,7 +2,7 @@ name: llm_markdown
 description: >-
   Markdown widget for streaming LLM chat replies. Parses only new text, closes
   half-typed syntax, highlights code and follows the scroll.
-version: 0.6.0
+version: 0.6.1
 repository: https://github.com/anant8140/llm_markdown
 issue_tracker: https://github.com/anant8140/llm_markdown/issues
 screenshots:
