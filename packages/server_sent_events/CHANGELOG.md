@@ -1,6 +1,21 @@
-## 0.1.1
+## 0.2.0
 
-* A shorter package description, so search results show all of it.
+* `SseClient`: a base URL, headers built for each request (async, so a
+  token can be fetched), and `onUnauthorized` to refresh a token after a
+  401 and try once more.
+* `onStatus`: connecting, open, reconnecting, closed.
+* `connectTimeout` and `idleTimeout`, for servers that don't answer and
+  connections that went quiet.
+* `Retry-After` on 429 and 503 is waited for; reconnect waits get
+  `jitter`.
+* `maxEventSize`, so a broken server can't fill the memory.
+* `onLine` sees every line, for logging.
+* `ofType`, and `openAIText`, `anthropicText` and `geminiText` for the text
+  of AI streams.
+* `SseEncoder`, `encodeSseEvent` and `encodeSseComment` for servers written
+  in Dart, with keep-alives.
+* `package:server_sent_events/testing.dart`: `FakeSseClient` for tests.
+* A shorter package description.
 
 ## 0.1.0
 

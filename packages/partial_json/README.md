@@ -60,6 +60,67 @@ parser.pendingPath; // ['items', 1, 'title']
 // items[0] is final; items[1].title is still being written
 ```
 
+### Each item as soon as it is finished
+
+```dart
+textStream
+    .transform(PartialJsonItemDecoder(
+      path: ['recipes'],
+      convert: (json) => Recipe.fromJson(json as Map<String, dynamic>),
+    ))
+    .listen((recipe) => setState(() => recipes.add(recipe)));
+```
+
+`onComplete` gives the same for every value: `PartialJsonParser(onComplete:
+(path, value) => ...)`. `changedPaths` lists what the last piece touched.
+
+### Snapshots
+
+The parser's maps and lists change in place. For state that is compared by
+identity (Riverpod, Bloc), take `parser.snapshot()` or use
+`PartialJsonDecoder(snapshots: true)`.
+
+### Repairing model JSON
+
+Models sometimes write single quotes, keys without quotes, comments or
+Python's `True`, `False` and `None`. `PartialJsonParser(repair: true)` reads
+them anyway, and `repairJson` gives valid JSON:
+
+```dart
+repairJson("{name: 'Ann', tags: ['a',], ok: True} // done");
+// {"name":"Ann","tags":["a"],"ok":true}
+```
+
+It is off by default, since it accepts text that isn't JSON.
+
+### Several documents and tool calls
+
+`PartialJsonDocumentsDecoder` reads documents one after another, such as
+JSON Lines, giving each as it grows and once more when it is finished.
+
+`ToolArgumentsParser` follows the arguments of streamed tool calls, which
+arrive as JSON pieces per call (OpenAI's `function.arguments`, Anthropic's
+`input_json_delta`):
+
+```dart
+final args = ToolArgumentsParser();
+args.add(call.id, delta); // the arguments so far, per call
+args.close(call.id);      // the finished arguments
+```
+
+### Settings
+
+| | default | |
+| --- | --- | --- |
+| `lenient` | `true` | skip text around the document, allow trailing commas |
+| `repair` | `false` | read common mistakes in model JSON |
+| `partialStrings` | `true` | show a string while it is written |
+| `partialNumbers` | `true` | show a number, `true`, `false`, `null` while written |
+| `bigInts` | `false` | large whole numbers as exact `BigInt`s |
+| `onComplete` | – | told when each value is finished |
+
+Errors are `FormatException`s naming the line and column, with the offset.
+
 ### Strict mode
 
 `PartialJsonParser(lenient: false)` accepts only JSON: nothing around the

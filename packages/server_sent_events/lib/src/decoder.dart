@@ -9,7 +9,13 @@ import 'event.dart';
 class SseDecoder extends StreamTransformerBase<List<int>, SseEvent> {
   /// A decoder; [lastEventId] is the ID to start from, as after a
   /// reconnect.
-  const SseDecoder({this.lastEventId, this.onRetry, this.onLastEventId});
+  const SseDecoder({
+    this.lastEventId,
+    this.onRetry,
+    this.onLastEventId,
+    this.onLine,
+    this.maxEventSize,
+  });
 
   /// The last event ID before the first event.
   final String? lastEventId;
@@ -21,6 +27,15 @@ class SseDecoder extends StreamTransformerBase<List<int>, SseEvent> {
   /// Called when an event block ends that changes the last event ID,
   /// whether it carries data or not.
   final void Function(String? id)? onLastEventId;
+
+  /// Called with every line as it arrives, comments and blank lines
+  /// included, for logging and debugging.
+  final void Function(String line)? onLine;
+
+  /// The most characters one event (its lines together) may have; a larger
+  /// one ends the stream with an [SseException], so a broken server can't
+  /// fill the memory. No limit when null.
+  final int? maxEventSize;
 
   @override
   Stream<SseEvent> bind(Stream<List<int>> stream) =>
@@ -49,6 +64,9 @@ class _DecoderSink implements EventSink<List<int>> {
   String? _type;
   final _data = StringBuffer();
   var _hasData = false;
+  // characters of the event being read, for maxEventSize
+  var _size = 0;
+  var _failed = false;
   Duration? _retry;
 
   // the start of a line that has not ended yet
@@ -58,7 +76,9 @@ class _DecoderSink implements EventSink<List<int>> {
   var _first = true;
 
   @override
-  void add(List<int> bytes) => _text.add(bytes);
+  void add(List<int> bytes) {
+    if (!_failed) _text.add(bytes);
+  }
 
   @override
   void addError(Object error, [StackTrace? stackTrace]) =>
@@ -66,9 +86,10 @@ class _DecoderSink implements EventSink<List<int>> {
 
   @override
   void close() {
+    if (_failed) return;
     _text.close();
     // an unfinished event at the end is dropped, as the standard says
-    _out.close();
+    if (!_failed) _out.close();
   }
 
   void _lines(String text) {
@@ -95,14 +116,30 @@ class _DecoderSink implements EventSink<List<int>> {
       start = i + 1;
     }
     _pending += text.substring(start);
+    _check(_pending.length);
+  }
+
+  // Ends the stream when the event being read is too large.
+  bool _check(int more) {
+    final limit = _decoder.maxEventSize;
+    if (_failed || limit == null || _size + more <= limit) return _failed;
+    _failed = true;
+    _out.addError(SseException('An event is larger than $limit characters'));
+    _out.close();
+    return true;
   }
 
   void _line(String line) {
+    if (_failed) return;
+    _decoder.onLine?.call(line);
     if (line.isEmpty) {
+      _size = 0;
       _dispatch();
       return;
     }
     if (line.codeUnitAt(0) == 0x3A) return; // a comment
+    if (_check(line.length)) return;
+    _size += line.length;
     final colon = line.indexOf(':');
     final String field;
     var value = '';

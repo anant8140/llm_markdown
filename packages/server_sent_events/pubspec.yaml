@@ -2,7 +2,7 @@ name: server_sent_events
 description: >-
   SSE client for Dart and Flutter: POST with headers and a body, cancel,
   reconnect with Last-Event-ID, and web support. Made for streaming AI APIs.
-version: 0.1.1
+version: 0.2.0
 repository: https://github.com/anant8140/llm_markdown/tree/main/packages/server_sent_events
 issue_tracker: https://github.com/anant8140/llm_markdown/issues
 topics:
@@ -17,6 +17,7 @@ environment:
 
 dependencies:
   http: ^1.6.0
+  http_parser: ^4.0.0
 
 dev_dependencies:
   async: ^2.11.0

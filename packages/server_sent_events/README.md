@@ -82,11 +82,73 @@ try {
 | `reconnect` | `GET`: `SseReconnect()`, others: `SseReconnect.none` | when to open the stream again |
 | `client` | a new `http.Client` | your own client, for example a mock in tests |
 | `lastEventId` | – | the ID to resume from |
+| `connectTimeout` | – | give up on a server that doesn't answer |
+| `idleTimeout` | – | drop a connection that went quiet |
+| `maxEventSize` | – | the largest event, in characters |
+| `onStatus` | – | told when the connection opens, drops and closes |
+| `onLine` | – | every line received, for logging |
 
 `SseReconnect(maxAttempts: 5, delay: 1 s, maxDelay: 30 s, factor: 2,
-onClose: false)` reconnects after a network error and after a 408, 429 or
-5xx status, and with `onClose` also after the server ends the stream. An
+jitter: 0.1, onClose: false)` reconnects after a network error, a timeout,
+and a 408, 429 or 5xx status, and with `onClose` also after the server ends the stream. An
 event that arrives resets the count.
+
+### A client with shared settings
+
+```dart
+final sse = SseClient(
+  baseUrl: Uri.parse('https://api.example.com/v1/'),
+  headers: () async => {'Authorization': 'Bearer ${await auth.token()}'},
+  onUnauthorized: () => auth.refresh(), // then the request is made again
+  connectTimeout: const Duration(seconds: 15),
+  idleTimeout: const Duration(seconds: 60),
+  maxEventSize: 1 << 20,
+);
+final events = sse.connect('chat', method: 'POST', body: body,
+    onStatus: (status) => setState(() => _status = status));
+// ...
+sse.close();
+```
+
+`onStatus` is told `connecting`, `open`, `reconnecting` and `closed`, for a
+"Reconnecting…" line in the app. A `Retry-After` header on a 429 or 503 is
+waited for, and reconnect waits vary a little (`jitter`) so many apps don't
+come back at the same moment.
+
+### The text of AI streams
+
+```dart
+await for (final text in events.openAIText()) { ... }    // Chat Completions or Responses
+await for (final text in events.anthropicText()) { ... } // Messages
+await for (final text in events.geminiText()) { ... }    // streamGenerateContent?alt=sse
+```
+
+An error event from the API ends the stream with an `SseException` holding
+its message. `ofType('name')` keeps one event type.
+
+### Sending events from a Dart server
+
+```dart
+request.response.headers.contentType = ContentType('text', 'event-stream');
+await events
+    .transform(const SseEncoder(keepAlive: Duration(seconds: 15)))
+    .transform(utf8.encoder)
+    .pipe(request.response);
+```
+
+### Testing
+
+`package:server_sent_events/testing.dart` has `FakeSseClient`, which answers
+with events or errors without a network:
+
+```dart
+final fake = FakeSseClient((request) => FakeSseResponse.events([
+  const SseEvent('{"text": "Hi"}'),
+  const SseEvent('[DONE]'),
+]));
+final events = connectSse(url, client: fake);
+// fake.requests, fake.bodies, fake.aborted
+```
 
 ### Decoding bytes you already have
 
