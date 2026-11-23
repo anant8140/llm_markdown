@@ -1,8 +1,6 @@
 name: llm_markdown_chat
 description: >-
-  A ready AI chat screen for Flutter on top of llm_markdown: message list,
-  streaming Markdown replies, input with send and stop, retry and copy. Works
-  with any model and any design library.
+  A ready AI chat screen for Flutter on llm_markdown: streaming Markdown replies, input with send and stop, retry and copy, for any model.
 version: 0.1.1
 repository: https://github.com/anant8140/llm_markdown/tree/main/packages/llm_markdown_chat
 issue_tracker: https://github.com/anant8140/llm_markdown/issues
