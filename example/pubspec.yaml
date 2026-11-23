@@ -29,6 +29,10 @@ dev_dependencies:
 
 # until the parser is on pub.dev, and to try changes to both together
 dependency_overrides:
+  llm_client:
+    path: ../packages/llm_client
+  llm_markdown:
+    path: ../
   llm_markdown_parser:
     path: ../packages/llm_markdown_parser
   partial_json:

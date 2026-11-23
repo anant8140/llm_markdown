@@ -22,6 +22,56 @@ import 'svg_image.dart';
 typedef MarkdownImageBuilder =
     Widget Function(BuildContext context, Uri uri, String? alt);
 
+/// The cells of a table as plain text, given to a [MarkdownTableBuilder].
+class MarkdownTableData {
+  /// The [rows] of a table; the first is the header when [hasHeader].
+  const MarkdownTableData(this.rows, {this.hasHeader = true});
+
+  /// The text of each cell, row by row, without formatting.
+  final List<List<String>> rows;
+
+  /// Whether the first row is the header.
+  final bool hasHeader;
+
+  /// The table as CSV, for copying into a spreadsheet: cells with a comma,
+  /// a quote or a line break are quoted.
+  ///
+  /// With [guardFormulas], a cell a spreadsheet would run as a formula
+  /// (starting with `=` or `@`, or with `+` or `-` before something that is
+  /// not a number) gets a leading `'`, since the text comes from a model.
+  String toCsv({bool guardFormulas = true}) =>
+      _separated(',', guardFormulas: guardFormulas);
+
+  /// The table as tab-separated text, which pastes into spreadsheets as
+  /// cells; tabs and line breaks inside a cell become spaces.
+  String toTsv({bool guardFormulas = true}) =>
+      _separated('\t', guardFormulas: guardFormulas);
+
+  static final _formula = RegExp(r'^(=|@|[+-](?![\d.]))');
+
+  String _separated(String separator, {required bool guardFormulas}) => rows
+      .map(
+        (row) => row
+            .map((cell) {
+              var text = cell;
+              if (guardFormulas && _formula.hasMatch(text)) text = "'$text";
+              if (separator == '\t') {
+                return text.replaceAll(RegExp(r'[\t\r\n]+'), ' ');
+              }
+              return text.contains(RegExp('[",\r\n]'))
+                  ? '"${text.replaceAll('"', '""')}"'
+                  : text;
+            })
+            .join(separator),
+      )
+      .join('\n');
+}
+
+/// Wraps or replaces a table: [table] is the built table, [data] its cells
+/// as text, for example to add a "Copy as CSV" button above it.
+typedef MarkdownTableBuilder =
+    Widget Function(BuildContext context, Widget table, MarkdownTableData data);
+
 /// Builds the widget for a Markdown element, such as one made by a custom
 /// syntax, or returns null for the default look.
 ///
@@ -81,6 +131,8 @@ class RenderSettings {
   ValueChanged<String>? onLinkTap;
 
   MarkdownImageBuilder? imageBuilder;
+
+  MarkdownTableBuilder? tableBuilder;
 
   MarkdownCodeBlockBuilder? codeBlockBuilder;
 
@@ -1136,14 +1188,18 @@ class _Builder {
 
   Widget _table(md.Element table) {
     final rows = <TableRow>[];
+    final texts = <List<String>>[];
+    var hasHeader = false;
     for (final section in table.children ?? const <md.Node>[]) {
       if (section is! md.Element) continue;
       final header = section.tag == 'thead';
       for (final row in section.children ?? const <md.Node>[]) {
         if (row is! md.Element || row.tag != 'tr') continue;
         final cells = <Widget>[];
+        final cellTexts = <String>[];
         for (final cell in row.children ?? const <md.Node>[]) {
           if (cell is! md.Element) continue;
+          cellTexts.add(cell.textContent.trim());
           final textStyle = header
               ? style.textStyle.copyWith(fontWeight: FontWeight.w700)
               : style.textStyle;
@@ -1173,6 +1229,8 @@ class _Builder {
           );
         }
         if (cells.isEmpty) continue;
+        if (header && rows.isEmpty) hasHeader = true;
+        texts.add(cellTexts);
         rows.add(
           TableRow(
             decoration: header
@@ -1189,7 +1247,7 @@ class _Builder {
       for (final row in rows)
         if (row.children.length == columns) row,
     ];
-    return Align(
+    final built = Align(
       alignment: AlignmentDirectional.centerStart,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -1200,6 +1258,16 @@ class _Builder {
           children: complete,
         ),
       ),
+    );
+    final builder = settings.tableBuilder;
+    if (builder == null) return built;
+    return builder(
+      context,
+      built,
+      MarkdownTableData([
+        for (final row in texts)
+          if (row.length == columns) row,
+      ], hasHeader: hasHeader),
     );
   }
 }

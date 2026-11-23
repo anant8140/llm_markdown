@@ -205,7 +205,14 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.6.1"
+    version: "0.7.0"
+  llm_markdown_client:
+    dependency: "direct main"
+    description:
+      path: "../packages/llm_markdown_client"
+      relative: true
+    source: path
+    version: "0.1.0"
   llm_markdown_parser:
     dependency: "direct overridden"
     description:

@@ -52,6 +52,7 @@ class StreamingMarkdown extends StatefulWidget {
     this.style,
     this.onLinkTap,
     this.imageBuilder,
+    this.tableBuilder,
     this.codeBlockBuilder,
     this.highlightCode = true,
     this.showCursor = true,
@@ -112,6 +113,7 @@ class StreamingMarkdown extends StatefulWidget {
     this.style,
     this.onLinkTap,
     this.imageBuilder,
+    this.tableBuilder,
     this.codeBlockBuilder,
     this.highlightCode = true,
     this.showCursor = true,
@@ -172,6 +174,7 @@ class StreamingMarkdown extends StatefulWidget {
     this.style,
     this.onLinkTap,
     this.imageBuilder,
+    this.tableBuilder,
     this.codeBlockBuilder,
     this.highlightCode = true,
     this.showCursor = true,
@@ -260,6 +263,10 @@ class StreamingMarkdown extends StatefulWidget {
   /// Blocks that are already built keep what the builder returned, so a new
   /// function on each rebuild costs nothing.
   final MarkdownImageBuilder? imageBuilder;
+
+  /// Wraps or replaces tables, with their cells as text: add a "Copy as
+  /// CSV" button with [MarkdownTableData.toCsv].
+  final MarkdownTableBuilder? tableBuilder;
 
   /// Builds code blocks, for example to show diagrams; return null to use
   /// the default code block.
@@ -810,6 +817,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       ..style = style
       ..onLinkTap = widget.onLinkTap
       ..imageBuilder = widget.imageBuilder
+      ..tableBuilder = widget.tableBuilder
       ..codeBlockBuilder = widget.codeBlockBuilder
       ..highlightCode = widget.highlightCode
       ..newlinesAsBreaks = widget.newlinesAsBreaks

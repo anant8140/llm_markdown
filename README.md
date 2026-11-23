@@ -167,6 +167,8 @@ selectable. With `ListView(reverse: true)` you don't need
 | `mathBuilder` | – | draws LaTeX, see above; without it math shows as Unicode (`x²`, `α`) |
 | `showThinking` / `thinkingInitiallyExpanded` / `thinkingLabel` | `true` / `false` / English | |
 | `showToolCalls` / `toolCallBuilder` | `true` / – | the lines for the tools the model calls |
+| `showToolCallArguments` | `true` | say what a tool call is about on its line |
+| `tableBuilder` | – | wrap tables, with their cells as text, for a "Copy as CSV" button |
 | `showCursor` / `cursorStyle` | `true` / block | also bar, underline, dots |
 | `placeholder` | – | shown until the first text arrives, e.g. `MarkdownShimmer()` |
 | `errorBuilder` | – | shown after `controller.completeWithError(error)` |
@@ -251,6 +253,11 @@ it at the top: "Using web search…", then "Used web search". Change the words
 with `MarkdownLabels(toolCall: ...)`, build the line yourself with
 `toolCallBuilder`, or hide it with `showToolCalls: false`.
 
+The line also says what the call is about, as the model writes it: "Using
+web search  Paris weather". That is `MarkdownToolCall.summary`, the first
+text among the call's arguments, read while they are still arriving
+(`argumentsSoFar`); `showToolCallArguments: false` leaves it out.
+
 Pages the model cites go to `controller.sources`. With Anthropic, `[1]`
 chips are put after the text each source supports; OpenAI's text already
 carries its links, and Gemini's grounding gives the pages without marks in
@@ -288,6 +295,31 @@ StreamingMarkdown(
 which comes with the package (about 270 KB in your app), so it looks the
 same on every platform. For another font, pass `monospace:` to
 `StreamingMarkdownStyle.fromColors`.
+
+### Tables
+
+Tables scroll sideways when they are wider than the reply. `tableBuilder`
+wraps a table and gets its cells as text:
+
+```dart
+StreamingMarkdown(
+  controller: controller,
+  tableBuilder: (context, table, data) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      TextButton(
+        onPressed: () => Clipboard.setData(ClipboardData(text: data.toCsv())),
+        child: const Text('Copy as CSV'),
+      ),
+      table,
+    ],
+  ),
+)
+```
+
+`toCsv()` quotes cells that need it, and `toTsv()` pastes into spreadsheets
+as cells. Both put a `'` before a cell a spreadsheet would run as a formula
+(`=SUM(...)`), since the text comes from a model.
 
 ### Long replies and chats
 
@@ -526,10 +558,14 @@ a normal parse of the full text. Golden images guard the look.
 ## Limitations
 
 - Once a footnote definition appears, the reply is parsed as a whole again
-  (correct, just not incremental).
+  (correct, just not incremental). With the definitions at the end of the
+  reply, where models write them, an 18,000-character reply took 13% longer
+  to parse; with one at the very start it is far slower.
 - Raw HTML is shown as text, apart from `<sub> <sup> <kbd> <mark> <u>
-  <ins> <small> <br>` and `<details>`.
-- Inline math has to fit on one line.
+  <ins> <small> <b> <strong> <i> <em> <s> <del> <strike> <code> <br>`
+  around plain text, and `<details>`.
+- Inline math in single `$` has to fit on one line; `\( ... \)` may run
+  over line ends.
 - Mermaid: the kinds listed under "Diagrams and SVG" only. Styling
   (`classDef`, `style`) is left out. Gantt charts read `YYYY-MM-DD` dates
   and day or week durations only.

@@ -35,6 +35,8 @@ export 'src/renderer.dart'
         MarkdownCursorBuilder,
         MarkdownElementBuilder,
         MarkdownImageBuilder,
+        MarkdownTableBuilder,
+        MarkdownTableData,
         MarkdownImageTapCallback,
         MarkdownMathBuilder,
         StreamingCursorStyle;

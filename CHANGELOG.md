@@ -1,3 +1,21 @@
+## 0.7.0
+
+* A tool call's line says what the call is about while the model writes it:
+  "Using web search  Paris weather". `MarkdownToolCall.argumentsSoFar` and
+  `summary` read the arguments as they arrive (with `partial_json`);
+  `showToolCallArguments: false` leaves the text out.
+* `tableBuilder` wraps tables and gets their cells as text
+  (`MarkdownTableData`), with `toCsv()` and `toTsv()` for a copy button.
+* More HTML tags around plain text: `<b> <strong> <i> <em> <s> <del>
+  <strike> <code>`.
+* Inline math written as `\( ... \)`, `\[ ... \]` or `$$ ... $$` may run
+  over line ends inside a paragraph.
+* A closing HTML tag of which only `</` has arrived no longer shows as text.
+* New companion packages:
+  [llm_markdown_client](https://pub.dev/packages/llm_markdown_client)
+  (`addLlmEvents`, for `llm_client`: OpenAI, Anthropic, Gemini, Ollama) and
+  [llm_structured_ui](https://pub.dev/packages/llm_structured_ui).
+
 ## 0.6.1
 
 * `addStream` stops at once when the reply is completed (a stop button) or
