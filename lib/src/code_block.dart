@@ -228,6 +228,10 @@ typedef _Job = (String, String?, TextStyle, Map<String, TextStyle>);
 TextSpan? _highlightJob(_Job job) =>
     highlightCode(job.$1, job.$2, job.$3, job.$4);
 
+// How many highlight jobs were started, for tests.
+@visibleForTesting
+int highlightJobs = 0;
+
 // Runs on a background isolate (on the web, later in the same one) so the
 // first use of a grammar never stalls a frame.
 Future<TextSpan?> highlightCodeInBackground(
@@ -237,6 +241,7 @@ Future<TextSpan?> highlightCodeInBackground(
   Map<String, TextStyle> theme,
 ) {
   if (language == null || language.isEmpty) return SynchronousFuture(null);
+  highlightJobs++;
   return compute(_highlightJob, (code, language, base, theme));
 }
 
@@ -275,6 +280,9 @@ class _CodeBlockViewState extends State<CodeBlockView> {
   // while streaming: the highlighted complete lines and their length
   TextSpan? _partial;
   int _partialLength = 0;
+  // how far a job has looked, highlighted or not: a language without a
+  // grammar gives nothing, and must not be tried again for the same text
+  int _triedLength = 0;
   bool _partialRunning = false;
   bool _copied = false;
   bool _expanded = false;
@@ -295,6 +303,7 @@ class _CodeBlockViewState extends State<CodeBlockView> {
         oldWidget.style != widget.style) {
       _partial = null;
       _partialLength = 0;
+      _triedLength = 0;
       _highlight();
     } else if (oldWidget.code != widget.code) {
       _highlight();
@@ -323,7 +332,7 @@ class _CodeBlockViewState extends State<CodeBlockView> {
   // finishes, the next one picks up whatever arrived meanwhile.
   void _highlightLines() {
     final end = widget.code.lastIndexOf('\n');
-    if (_partialRunning || end <= _partialLength) return;
+    if (_partialRunning || end <= _triedLength) return;
     _partialRunning = true;
     final prefix = widget.code.substring(0, end);
     highlightCodeInBackground(
@@ -334,11 +343,17 @@ class _CodeBlockViewState extends State<CodeBlockView> {
     ).then((span) {
       _partialRunning = false;
       if (!mounted || widget.highlight) return;
-      if (span != null && widget.code.startsWith(prefix)) {
-        setState(() {
-          _partial = span;
-          _partialLength = prefix.length;
-        });
+      if (widget.code.startsWith(prefix)) {
+        _triedLength = prefix.length;
+        if (span != null) {
+          setState(() {
+            _partial = span;
+            _partialLength = prefix.length;
+          });
+        }
+      } else {
+        // the text was replaced: start over
+        _triedLength = 0;
       }
       _highlightLines();
     });

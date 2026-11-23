@@ -39,6 +39,10 @@
 * `reset()` or `complete()` while an `add...Stream` is reading cancels the
   response body right away, which closes its connection, instead of
   waiting for the server's next chunk.
+* A streaming code block in a language with no highlighting grammar, such
+  as a ` ```mermaid ` block, with `highlightWhileStreaming` on, retried
+  the same text without end. On the web that froze the page; elsewhere it
+  kept starting background work. It is now tried once per new line.
 * Code no longer shows ligatures: the bundled JetBrains Mono drew `<|`, `->`
   or `!=` as one symbol, so code didn't show the characters that were
   written. `StreamingMarkdownStyle.codeFont` turns them off.
