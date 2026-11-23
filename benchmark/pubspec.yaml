@@ -1,0 +1,20 @@
+name: llm_markdown_benchmark
+description: Memory and time of llm_markdown against flutter_markdown_plus while a long reply streams in.
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.35.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  llm_markdown:
+    path: ..
+  flutter_markdown_plus: ^1.0.12
+  # the harness in lib/ drives widget tests
+  flutter_test:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^6.0.0

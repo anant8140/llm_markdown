@@ -1,5 +1,6 @@
 # published on its own, with tool/publish_parser.sh
 packages/
+benchmark/
 tool/
 
 # A .pubignore replaces the .gitignore next to it, so its rules are repeated

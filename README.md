@@ -453,6 +453,15 @@ Phones are slower, so expect both columns to be several times higher there.
 To run it yourself: `flutter run --profile -t lib/benchmark.dart` in
 `example/`.
 
+Memory and total time, for a 20,000-character reply in 2,472 chunks against
+`flutter_markdown_plus` rebuilt with the whole text per chunk (debug mode,
+three runs; details and caveats in [benchmark/](https://github.com/anant8140/llm_markdown/tree/main/benchmark)):
+
+| | memory peak | total time | 95% of chunks under |
+| --- | --- | --- | --- |
+| llm_markdown | +123 to +131 MB | 11.1 to 12.3 s | 7.6 to 8.6 ms |
+| flutter_markdown_plus | +282 to +294 MB | 144.7 to 147.9 s | 135 to 140 ms |
+
 ## How it works
 
 The text is split into blocks only at points where nothing that comes later
