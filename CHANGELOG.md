@@ -4,6 +4,16 @@
   "Using web search  Paris weather". `MarkdownToolCall.argumentsSoFar` and
   `summary` read the arguments as they arrive (with `partial_json`);
   `showToolCallArguments: false` leaves the text out.
+* Mermaid: flowcharts, state and class diagrams are drawn in the diagram's
+  own colors: `classDef`, `class`, `:::`, `style` and (flowcharts)
+  `linkStyle`, with fill, stroke, stroke-width, color and stroke-dasharray.
+  Colors are `#rgb`, `#rrggbb`, `#rrggbbaa` or a common CSS name; text on a
+  filled node turns black or white when the diagram gives no `color`.
+* Mermaid: five more kinds are drawn natively: `gitGraph` (branches as
+  lanes, merges, tags, commit types), `journey`, `quadrantChart`,
+  `sankey-beta` and `xychart-beta` (bars and lines).
+  `MermaidDiagram.supports` is now true for them, so a `codeBlockBuilder`
+  that hands unsupported kinds elsewhere no longer gets them.
 * `tableBuilder` wraps tables and gets their cells as text
   (`MarkdownTableData`), with `toCsv()` and `toTsv()` for a copy button.
 * More HTML tags around plain text: `<b> <strong> <i> <em> <s> <del>

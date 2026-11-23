@@ -13,11 +13,15 @@ import 'mermaid_model.dart';
 /// flowcharts (with `subgraph` boxes), state diagrams (with composite
 /// states and notes), class diagrams (with notes and cardinalities), ER
 /// diagrams, sequence diagrams, pie charts, gantt charts (`YYYY-MM-DD`
-/// dates, day and week spans), mindmaps and timelines. Other kinds, and
-/// text these readers can't follow, are not drawn: [supports] is false for
-/// them and [fallback] is shown.
+/// dates, day and week spans), mindmaps, timelines, git graphs
+/// (`gitGraph`), user journeys, quadrant charts, sankey diagrams and xy
+/// charts. Other kinds, and text these readers can't follow, are not
+/// drawn: [supports] is false for them and [fallback] is shown.
 ///
-/// Styling (`classDef`, `style`, icons) is left out.
+/// Flowcharts, state and class diagrams take the diagram's own colors
+/// from `classDef`, `class`, `:::`, `style` and (flowcharts) `linkStyle`:
+/// fill, stroke, stroke-width, color and stroke-dasharray. Icons and
+/// other CSS are left out.
 class MermaidDiagram extends StatefulWidget {
   /// Draws the diagram written in [source].
   const MermaidDiagram(this.source, {super.key, this.style, this.fallback});
@@ -321,6 +325,20 @@ class _SceneBuilder {
     });
   }
 
+  // The color of the text in a node the diagram styles: its "color", or
+  // black or white, whichever reads better on its fill. Null (the theme's
+  // text color) without a fill, and on a fill more than half see-through,
+  // where what is behind the diagram shows.
+  static Color? _textOn(FlowStyle? style) {
+    final own = style?.color;
+    if (own != null) return Color(own);
+    final fill = style?.fill;
+    if (fill == null || Color(fill).a < 0.5) return null;
+    return Color(fill).computeLuminance() > 0.179
+        ? const Color(0xFF000000)
+        : const Color(0xFFFFFFFF);
+  }
+
   _Scene build(MermaidData data) {
     final (size, description) = switch (data) {
       FlowChart() => _flow(data),
@@ -329,6 +347,11 @@ class _SceneBuilder {
       GanttChart() => _gantt(data),
       MindMap() => _mindmap(data),
       Timeline() => _timeline(data),
+      GitGraph() => _gitGraph(data),
+      Journey() => _journey(data),
+      QuadrantChart() => _quadrant(data),
+      Sankey() => _sankey(data),
+      XyChart() => _xyChart(data),
     };
     return _Scene(size, ops, painters, description);
   }
@@ -743,7 +766,13 @@ class _SceneBuilder {
     final total = layoutRank.length;
     bool isLane(int i) => i >= nodes.length && i < firstNote;
 
-    final labels = [for (final node in nodes) measure(node.label)];
+    final labels = [
+      for (final node in nodes)
+        measure(
+          node.label,
+          style: labelStyle.copyWith(color: _textOn(node.style)),
+        ),
+    ];
     final classes = {
       for (var i = 0; i < nodes.length; i++)
         if (nodes[i].shape == NodeShape.classBox ||
@@ -1218,10 +1247,20 @@ class _SceneBuilder {
           );
         }
       }
+      // a linkStyle line gives the edge its own color, width and dashes
+      final own = edge.style;
+      final ownStroke = own?.stroke;
+      final edgeColor = ownStroke == null ? line : Color(ownStroke);
+      final thick = edge.line == EdgeLine.thick;
       drawPath(
         path,
-        edge.line == EdgeLine.thick ? stroke(line, 2.6) : edgePaint,
-        dashed: edge.line == EdgeLine.dotted,
+        own == null
+            ? (thick ? stroke(line, 2.6) : edgePaint)
+            : stroke(
+                edgeColor,
+                math.max(0.5, own.strokeWidth ?? (thick ? 2.6 : 1.4)),
+              ),
+        dashed: edge.line == EdgeLine.dotted || own?.dashed == true,
       );
       // the route runs from low to high, so a reversed edge has its head at
       // the start of the route and its tail at the end
@@ -1231,13 +1270,13 @@ class _SceneBuilder {
         edge.head,
         reversed ? first : last,
         reversed ? forward + math.pi : forward,
-        line,
+        edgeColor,
       );
       drawMarker(
         edge.tail,
         reversed ? last : first,
         reversed ? forward : forward + math.pi,
-        line,
+        edgeColor,
       );
       // cardinalities sit beside each end, clear of the line and markers,
       // on the side away from the middle of the box
@@ -1268,7 +1307,8 @@ class _SceneBuilder {
                 fontSize: (labelStyle.fontSize ?? 13) * 0.9,
                 color: text.withValues(alpha: 0.8),
               )
-              .merge(look.edgeLabelStyle),
+              .merge(look.edgeLabelStyle)
+              .copyWith(color: own?.color == null ? null : Color(own!.color!)),
           maxWidth: 140,
         );
         // on the middle of the edge's middle stretch, as Mermaid does
@@ -1400,12 +1440,26 @@ class _SceneBuilder {
         );
         continue;
       }
-      final inside = Paint()..color = fill;
-      final outline = stroke(border);
+      // the diagram's own colors (classDef, style) go over the theme's
+      final own = nodes[i].style;
+      final ownFill = own?.fill;
+      final ownStroke = own?.stroke;
+      final inside = Paint()..color = ownFill == null ? fill : Color(ownFill);
+      final width = own?.strokeWidth ?? 1.4;
+      // "stroke-width:0" is no outline at all
+      final outline = stroke(
+        width <= 0
+            ? const Color(0x00000000)
+            : ownStroke == null
+            ? border
+            : Color(ownStroke),
+        width,
+      );
+      final edge = own?.dashed == true ? _dash(path) : path;
       ops.add(
         (canvas) => canvas
           ..drawPath(path, inside)
-          ..drawPath(path, outline),
+          ..drawPath(edge, outline),
       );
       final parts = classes[i];
       if (parts == null) {
@@ -1592,6 +1646,7 @@ class _SceneBuilder {
   _ClassParts _classParts(FlowNode node) {
     final small = labelStyle.copyWith(
       fontSize: (labelStyle.fontSize ?? 13) * 0.88,
+      color: _textOn(node.style),
     );
     // an entity's attributes are one section
     final entity = node.shape == NodeShape.entity;
@@ -1617,7 +1672,10 @@ class _SceneBuilder {
           : measure('«${node.annotation}»', style: small),
       name: measure(
         node.label,
-        style: labelStyle.copyWith(fontWeight: FontWeight.w600),
+        style: small.copyWith(
+          fontSize: labelStyle.fontSize,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       fields: list(fields),
       methods: list(methods),
@@ -2452,6 +2510,838 @@ class _SceneBuilder {
           '${[for (final period in periods) period.events.isEmpty ? period.text : '${period.text}: ${period.events.join(', ')}'].join('; ')}',
     );
   }
+
+  // ---- shared by the charts below -----------------------------------
+
+  TextStyle get _small =>
+      labelStyle.copyWith(fontSize: (labelStyle.fontSize ?? 13) * 0.88);
+
+  TextPainter? _titleOf(String? title) => title == null
+      ? null
+      : measure(
+          title,
+          style: labelStyle.copyWith(fontWeight: FontWeight.w600),
+          maxWidth: 360,
+        );
+
+  // text read from the bottom up, as along a y axis
+  void drawTextTurned(TextPainter painter, Offset center) {
+    final at = Offset(-painter.width / 2, -painter.height / 2);
+    ops.add((canvas) {
+      canvas
+        ..save()
+        ..translate(center.dx, center.dy)
+        ..rotate(-math.pi / 2);
+      painter.paint(canvas, at);
+      canvas.restore();
+    });
+  }
+
+  // ---- git graph ----------------------------------------------------
+
+  (Size, String) _gitGraph(GitGraph graph) {
+    final palette = _colors;
+    final small = _small;
+    final bold = small.copyWith(fontWeight: FontWeight.w600);
+    final commits = graph.commits;
+    // a branch gets a lane once it has a commit
+    final used = [
+      for (var b = 0; b < graph.branches.length; b++)
+        if (commits.any((commit) => commit.branch == b)) b,
+    ];
+    final laneOf = {for (var k = 0; k < used.length; k++) used[k]: k};
+    final names = [
+      for (final b in used)
+        measure(graph.branches[b], style: bold, maxWidth: 120),
+    ];
+    final ids = [
+      for (final commit in commits)
+        commit.label == null
+            ? null
+            : measure(commit.label!, style: small, maxWidth: 90),
+    ];
+    final tags = [
+      for (final commit in commits)
+        commit.tag == null
+            ? null
+            : measure(commit.tag!, style: small, maxWidth: 110),
+    ];
+    const radius = 8.0;
+    final nameWidth = names.map((name) => name.width).fold(0.0, math.max) + 16;
+    final tagHeight = tags.nonNulls
+        .map((tag) => tag.height)
+        .fold(0.0, math.max);
+    final tagRoom = tagHeight == 0 ? 0.0 : tagHeight + 10;
+    final idRoom = ids.nonNulls.map((id) => id.height).fold(0.0, math.max);
+    final laneHeight = math.max(
+      tagRoom + radius * 2 + idRoom + 14,
+      names.map((name) => name.height).fold(0.0, math.max) + 14,
+    );
+    // a column per commit, in the order they were made
+    final xs = <double>[];
+    var right = _pad + nameWidth + 12;
+    for (var i = 0; i < commits.length; i++) {
+      final width = [
+        38.0,
+        (ids[i]?.width ?? 0) + 10,
+        (tags[i]?.width ?? 0) + 18,
+      ].reduce(math.max);
+      xs.add(right + width / 2);
+      right += width;
+    }
+    double laneY(int lane) => _pad + lane * laneHeight + tagRoom + radius + 2;
+    Offset at(int i) => Offset(xs[i], laneY(laneOf[commits[i].branch]!));
+    Color colorOf(int branch) => palette[laneOf[branch]! % palette.length];
+
+    for (var k = 0; k < used.length; k++) {
+      final color = palette[k % palette.length];
+      final y = laneY(k);
+      final box = RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          _pad,
+          y - names[k].height / 2 - 4,
+          nameWidth,
+          names[k].height + 8,
+        ),
+        const Radius.circular(6),
+      );
+      final inside = Paint()..color = color.withValues(alpha: 0.2);
+      final outline = stroke(color, 1);
+      final lane = stroke(color.withValues(alpha: 0.35), 1);
+      final end = Offset(right, y);
+      ops.add(
+        (canvas) => canvas
+          ..drawLine(Offset(box.right, y), end, lane)
+          ..drawRRect(box, inside)
+          ..drawRRect(box, outline),
+      );
+      drawText(names[k], box.center);
+    }
+    // the lines between commits: straight along a lane, an S where a
+    // branch leaves a lane or is merged into one
+    for (var i = 0; i < commits.length; i++) {
+      final commit = commits[i];
+      final to = at(i);
+      for (var p = 0; p < commit.parents.length; p++) {
+        final parent = commit.parents[p];
+        final from = at(parent);
+        final middle = (from.dx + to.dx) / 2;
+        final path = Path()..moveTo(from.dx, from.dy);
+        if (from.dy == to.dy) {
+          path.lineTo(to.dx, to.dy);
+        } else {
+          path.cubicTo(middle, from.dy, middle, to.dy, to.dx, to.dy);
+        }
+        // a merge line has the color of the branch merged in
+        drawPath(
+          path,
+          stroke(colorOf(p == 0 ? commit.branch : commits[parent].branch), 2),
+        );
+      }
+    }
+    final erase = Paint()..blendMode = BlendMode.clear;
+    final tagInside = Paint()
+      ..color =
+          look.noteColor ?? const Color(0xFFF2C94C).withValues(alpha: 0.22);
+    final tagOutline = stroke(
+      look.noteBorderColor ?? const Color(0xFFC9A227).withValues(alpha: 0.8),
+      1,
+    );
+    for (var i = 0; i < commits.length; i++) {
+      final commit = commits[i];
+      final center = at(i);
+      final color = colorOf(commit.branch);
+      final solid = Paint()..color = color;
+      final pen = stroke(color, 2.4);
+      switch (commit.type) {
+        case GitCommitType.highlight:
+          // a square
+          final square = Rect.fromCircle(center: center, radius: radius);
+          ops.add((canvas) => canvas.drawRect(square, solid));
+        case GitCommitType.reverse:
+          // a ring with a cross in it
+          const arm = radius * 0.45;
+          final cross = Path()
+            ..moveTo(center.dx - arm, center.dy - arm)
+            ..lineTo(center.dx + arm, center.dy + arm)
+            ..moveTo(center.dx + arm, center.dy - arm)
+            ..lineTo(center.dx - arm, center.dy + arm);
+          ops.add(
+            (canvas) => canvas
+              ..drawCircle(center, radius, erase)
+              ..drawCircle(center, radius - 1.2, pen)
+              ..drawPath(cross, pen),
+          );
+        case GitCommitType.normal when commit.merge:
+          // a ring around a dot
+          ops.add(
+            (canvas) => canvas
+              ..drawCircle(center, radius, erase)
+              ..drawCircle(center, radius - 1.2, pen)
+              ..drawCircle(center, 2.6, solid),
+          );
+        case GitCommitType.normal:
+          ops.add((canvas) => canvas.drawCircle(center, radius, solid));
+      }
+      final tag = tags[i];
+      if (tag != null) {
+        final box = RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: Offset(
+              center.dx,
+              center.dy - radius - 5 - (tag.height + 4) / 2,
+            ),
+            width: tag.width + 10,
+            height: tag.height + 4,
+          ),
+          const Radius.circular(3),
+        );
+        ops.add(
+          (canvas) => canvas
+            ..drawRRect(box, tagInside)
+            ..drawRRect(box, tagOutline),
+        );
+        drawText(tag, box.center);
+      }
+      final id = ids[i];
+      if (id != null) {
+        drawText(id, Offset(center.dx, center.dy + radius + 3 + id.height / 2));
+      }
+    }
+    return (
+      Size(right + _pad, _pad * 2 + used.length * laneHeight),
+      'Git graph: ${[for (final b in used) graph.branches[b]].join(', ')}; '
+          '${commits.length} commits',
+    );
+  }
+
+  // ---- user journey -------------------------------------------------
+
+  (Size, String) _journey(Journey journey) {
+    final palette = _colors;
+    final small = _small;
+    final bold = labelStyle.copyWith(fontWeight: FontWeight.w600);
+    final title = _titleOf(journey.title);
+    final tasks = journey.tasks;
+    final sections = <String>{
+      for (final task in tasks)
+        if (task.section != null) task.section!,
+    }.toList();
+    final actors = <String>{for (final task in tasks) ...task.actors}.toList();
+    final names = [
+      for (final task in tasks) measure(task.name, style: small, maxWidth: 110),
+    ];
+    const columnGap = 10.0;
+    final widths = [for (final name in names) math.max(84.0, name.width + 16)];
+    final xs = <double>[_pad];
+    for (final width in widths) {
+      xs.add(xs.last + width + columnGap);
+    }
+    Color colorOf(int k) =>
+        palette[math.max(0, sections.indexOf(tasks[k].section ?? '')) %
+            palette.length];
+    // actors are told apart by colors from the far end of the palette
+    Color actorColor(String actor) =>
+        palette[(palette.length - 1 - actors.indexOf(actor)) % palette.length];
+
+    var y = _pad;
+    var right = xs.last - columnGap;
+    if (title != null) {
+      final at = Offset(_pad, y);
+      ops.add((canvas) => title.paint(canvas, at));
+      right = math.max(right, _pad + title.width);
+      y += title.height + 10;
+    }
+    if (actors.isNotEmpty) {
+      // who is who: a dot and a name each
+      var x = _pad;
+      var height = 0.0;
+      for (final actor in actors) {
+        final painter = measure(actor, style: small, maxWidth: 120);
+        final dot = Paint()..color = actorColor(actor);
+        final center = Offset(x + 5, y + painter.height / 2);
+        final at = Offset(x + 14, y);
+        ops.add((canvas) {
+          canvas.drawCircle(center, 4, dot);
+          painter.paint(canvas, at);
+        });
+        x = at.dx + painter.width + 14;
+        height = math.max(height, painter.height);
+      }
+      right = math.max(right, x - 14);
+      y += height + 10;
+    }
+    if (sections.isNotEmpty) {
+      // a band over the tasks of each section
+      var height = 0.0;
+      final runs = <(int, int, TextPainter)>[];
+      for (var k = 0; k < tasks.length;) {
+        var end = k;
+        while (end + 1 < tasks.length &&
+            tasks[end + 1].section == tasks[k].section) {
+          end++;
+        }
+        final name = tasks[k].section;
+        if (name != null) {
+          final painter = measure(
+            name,
+            style: bold,
+            maxWidth: xs[end + 1] - columnGap - xs[k] - 12,
+          );
+          height = math.max(height, painter.height + 10);
+          runs.add((k, end, painter));
+        }
+        k = end + 1;
+      }
+      for (final (start, end, painter) in runs) {
+        final color = colorOf(start);
+        final band = RRect.fromLTRBR(
+          xs[start],
+          y,
+          xs[end + 1] - columnGap,
+          y + height,
+          const Radius.circular(6),
+        );
+        final inside = Paint()..color = color.withValues(alpha: 0.3);
+        final outline = stroke(color, 1);
+        ops.add(
+          (canvas) => canvas
+            ..drawRRect(band, inside)
+            ..drawRRect(band, outline),
+        );
+        drawText(painter, band.center);
+      }
+      y += height + 8;
+    }
+    final dotRoom = actors.isEmpty ? 0.0 : 12.0;
+    final boxHeight =
+        names.map((name) => name.height).fold(0.0, math.max) + 12 + dotRoom;
+    // under each task a face, higher the better the score
+    const faceRadius = 10.0;
+    const step = 15.0;
+    final faceTop = y + boxHeight + 12;
+    final axisY = faceTop + faceRadius * 2 + step * 4 + 8;
+    final pen = stroke(line, 1.3);
+    final ink = Paint()..color = line;
+    for (var k = 0; k < tasks.length; k++) {
+      final task = tasks[k];
+      final color = colorOf(k);
+      final middle = xs[k] + widths[k] / 2;
+      final box = RRect.fromLTRBR(
+        xs[k],
+        y,
+        xs[k] + widths[k],
+        y + boxHeight,
+        const Radius.circular(6),
+      );
+      final inside = Paint()..color = color.withValues(alpha: 0.2);
+      final outline = stroke(color);
+      ops.add(
+        (canvas) => canvas
+          ..drawRRect(box, inside)
+          ..drawRRect(box, outline),
+      );
+      drawText(names[k], Offset(middle, box.top + (boxHeight - dotRoom) / 2));
+      for (var a = 0; a < task.actors.length; a++) {
+        final dot = Paint()..color = actorColor(task.actors[a]);
+        final center = Offset(
+          middle + (a - (task.actors.length - 1) / 2) * 11,
+          box.bottom - 8,
+        );
+        ops.add((canvas) => canvas.drawCircle(center, 3.5, dot));
+      }
+      final face = Offset(
+        middle,
+        faceTop + faceRadius + (5 - task.score) * step,
+      );
+      drawPath(
+        Path()
+          ..moveTo(middle, box.bottom)
+          ..lineTo(middle, face.dy - faceRadius),
+        stroke(color.withValues(alpha: 0.6), 1),
+        dashed: true,
+      );
+      drawPath(
+        Path()
+          ..moveTo(middle, face.dy + faceRadius)
+          ..lineTo(middle, axisY),
+        stroke(color.withValues(alpha: 0.6), 1),
+        dashed: true,
+      );
+      // the mouth bends up for a good score and down for a bad one
+      final bend = (task.score - 3) * 2.4;
+      final mouthY = face.dy + 4 - bend / 2;
+      final mouth = Path()
+        ..moveTo(face.dx - 4.5, mouthY)
+        ..quadraticBezierTo(face.dx, mouthY + bend, face.dx + 4.5, mouthY);
+      final skin = Paint()..color = color.withValues(alpha: 0.25);
+      ops.add(
+        (canvas) => canvas
+          ..drawCircle(face, faceRadius, skin)
+          ..drawCircle(face, faceRadius, pen)
+          ..drawCircle(face + const Offset(-3.5, -3), 1.2, ink)
+          ..drawCircle(face + const Offset(3.5, -3), 1.2, ink)
+          ..drawPath(mouth, pen),
+      );
+      final score = measure('${task.score}', style: small);
+      drawText(
+        score,
+        Offset(face.dx + faceRadius + 4 + score.width / 2, face.dy),
+      );
+    }
+    drawPath(
+      Path()
+        ..moveTo(_pad, axisY)
+        ..lineTo(right, axisY),
+      stroke(line, 1.4),
+    );
+    drawHead(Offset(right, axisY), 0, line);
+    return (
+      Size(right + _pad, axisY + 6 + _pad),
+      'Journey${journey.title == null ? '' : ' ${journey.title}'}: '
+          '${[for (final task in tasks) '${task.name} ${task.score}'].join(', ')}',
+    );
+  }
+
+  // ---- quadrant chart -----------------------------------------------
+
+  (Size, String) _quadrant(QuadrantChart chart) {
+    final palette = _colors;
+    final small = _small;
+    const side = 280.0;
+    const half = side / 2;
+    final title = _titleOf(chart.title);
+    TextPainter? axis(String? text) =>
+        text == null ? null : measure(text, style: small, maxWidth: half - 8);
+    final xLow = axis(chart.xLow);
+    final xHigh = axis(chart.xHigh);
+    final yLow = axis(chart.yLow);
+    final yHigh = axis(chart.yHigh);
+    final yRoom = [
+      yLow,
+      yHigh,
+    ].nonNulls.map((label) => label.height + 6).fold(0.0, math.max);
+    final xRoom = [
+      xLow,
+      xHigh,
+    ].nonNulls.map((label) => label.height + 6).fold(0.0, math.max);
+    var top = _pad;
+    var right = _pad + yRoom + side;
+    if (title != null) {
+      final at = Offset(_pad, top);
+      ops.add((canvas) => title.paint(canvas, at));
+      right = math.max(right, _pad + title.width);
+      top += title.height + 10;
+    }
+    final plot = Rect.fromLTWH(_pad + yRoom, top, side, side);
+    // quadrant-1 is the top right one, then they go round to the left
+    final corners = [
+      Offset(plot.center.dx, plot.top),
+      plot.topLeft,
+      Offset(plot.left, plot.center.dy),
+      plot.center,
+    ];
+    final nameStyle = small.copyWith(
+      fontWeight: FontWeight.w600,
+      color: text.withValues(alpha: 0.75),
+    );
+    for (var q = 0; q < 4; q++) {
+      final rect = corners[q] & const Size(half, half);
+      // the two diagonals in two strengths, so the four are told apart
+      final inside = Paint()
+        ..color = fill.withValues(alpha: fill.a * (q.isEven ? 1 : 0.4));
+      ops.add((canvas) => canvas.drawRect(rect, inside));
+      final name = chart.quadrants[q];
+      if (name == null) continue;
+      final painter = measure(name, style: nameStyle, maxWidth: half - 12);
+      drawText(
+        painter,
+        Offset(rect.center.dx, rect.top + 8 + painter.height / 2),
+      );
+    }
+    final frame = stroke(border, 1);
+    final cross = Path()
+      ..moveTo(plot.center.dx, plot.top)
+      ..lineTo(plot.center.dx, plot.bottom)
+      ..moveTo(plot.left, plot.center.dy)
+      ..lineTo(plot.right, plot.center.dy);
+    ops.add(
+      (canvas) => canvas
+        ..drawPath(cross, frame)
+        ..drawRect(plot, frame),
+    );
+    for (var i = 0; i < chart.points.length; i++) {
+      final point = chart.points[i];
+      final center = Offset(
+        plot.left + point.x * side,
+        plot.bottom - point.y * side,
+      );
+      final dot = Paint()..color = palette[i % palette.length];
+      ops.add((canvas) => canvas.drawCircle(center, 4.5, dot));
+      final label = measure(point.name, style: small, maxWidth: 100);
+      // under the dot, or over it at the bottom edge; kept inside the plot
+      final under = center.dy + 7 + label.height <= plot.bottom;
+      drawText(
+        label,
+        Offset(
+          center.dx.clamp(
+            plot.left + label.width / 2,
+            plot.right - label.width / 2,
+          ),
+          under
+              ? center.dy + 7 + label.height / 2
+              : center.dy - 7 - label.height / 2,
+        ),
+      );
+    }
+    // the axis names: "low" by the first half, "high" by the second; one
+    // name alone is centered
+    void along(
+      TextPainter? low,
+      TextPainter? high,
+      Offset Function(double) at,
+      void Function(TextPainter, Offset) draw,
+    ) {
+      if (low != null) draw(low, at(high == null ? half : half / 2));
+      if (high != null) draw(high, at(half * 1.5));
+    }
+
+    along(
+      xLow,
+      xHigh,
+      (x) => Offset(plot.left + x, plot.bottom + xRoom / 2),
+      drawText,
+    );
+    along(
+      yLow,
+      yHigh,
+      (y) => Offset(plot.left - yRoom / 2, plot.bottom - y),
+      drawTextTurned,
+    );
+    final names = chart.points.isEmpty
+        ? chart.quadrants.nonNulls
+        : chart.points.map((point) => point.name);
+    return (
+      Size(right + _pad, plot.bottom + xRoom + _pad),
+      'Quadrant chart${chart.title == null ? '' : ' ${chart.title}'}: '
+          '${names.join(', ')}',
+    );
+  }
+
+  // ---- sankey diagram -----------------------------------------------
+
+  (Size, String) _sankey(Sankey sankey) {
+    final palette = _colors;
+    final count = sankey.nodes.length;
+    final links = sankey.links;
+    // links that close a cycle don't push columns to the right
+    final back = <int>{};
+    final state = List.filled(count, 0);
+    void visit(int node) {
+      state[node] = 1;
+      for (var i = 0; i < links.length; i++) {
+        if (links[i].source != node) continue;
+        final next = links[i].target;
+        if (state[next] == 1) {
+          back.add(i);
+        } else if (state[next] == 0) {
+          visit(next);
+        }
+      }
+      state[node] = 2;
+    }
+
+    for (var i = 0; i < count; i++) {
+      if (state[i] == 0) visit(i);
+    }
+    final column = List.filled(count, 0);
+    for (var round = 0; round < count; round++) {
+      var moved = false;
+      for (var i = 0; i < links.length; i++) {
+        if (back.contains(i)) continue;
+        final link = links[i];
+        if (column[link.target] < column[link.source] + 1) {
+          column[link.target] = column[link.source] + 1;
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+    final into = List.filled(count, 0.0);
+    final outOf = List.filled(count, 0.0);
+    for (final link in links) {
+      outOf[link.source] += link.value;
+      into[link.target] += link.value;
+    }
+    final values = [
+      for (var i = 0; i < count; i++) math.max(into[i], outOf[i]),
+    ];
+    final labels = [
+      for (var i = 0; i < count; i++)
+        measure(
+          '${sankey.nodes[i]} ${_plain(values[i])}',
+          style: _small,
+          maxWidth: 140,
+          align: TextAlign.start,
+        ),
+    ];
+    final columns = [
+      for (var c = 0; c <= column.fold(0, math.max); c++)
+        [
+          for (var i = 0; i < count; i++)
+            if (column[i] == c) i,
+        ],
+    ];
+    const barWidth = 12.0;
+    const nodeGap = 8.0;
+    final columnGap = math.max(
+      80.0,
+      labels.map((label) => label.width).fold(0.0, math.max) + 24,
+    );
+    // one scale for every column: the fullest one fills the height
+    final height = math.max(
+      200.0,
+      columns.map((nodes) => nodes.length).fold(0, math.max) * 26.0,
+    );
+    final scale = columns
+        .map(
+          (nodes) =>
+              (height - (nodes.length - 1) * nodeGap) /
+              nodes.fold(0.0, (sum, i) => sum + values[i]),
+        )
+        .reduce(math.min);
+    final bars = List.filled(count, Rect.zero);
+    var bottom = _pad;
+    var right = _pad;
+    for (var c = 0; c < columns.length; c++) {
+      final x = _pad + c * (barWidth + columnGap);
+      var y = _pad;
+      for (final i in columns[c]) {
+        final bar = math.max(2.0, values[i] * scale);
+        // a thin bar still gets the room its label needs
+        final slot = math.max(bar, labels[i].height);
+        bars[i] = Rect.fromLTWH(x, y + (slot - bar) / 2, barWidth, bar);
+        y += slot + nodeGap;
+        right = math.max(right, x + barWidth + 6 + labels[i].width);
+      }
+      bottom = math.max(bottom, y - nodeGap);
+    }
+    // each link is a band as thick as its value, from its place on the
+    // source's right side to its place on the target's left side
+    final left = List.filled(count, 0.0);
+    final leaving = List.filled(count, 0.0);
+    for (final link in links) {
+      final from = bars[link.source];
+      final to = bars[link.target];
+      final thick = math.max(1.0, link.value * scale);
+      final y0 = from.top + leaving[link.source];
+      final y1 = to.top + left[link.target];
+      leaving[link.source] += link.value * scale;
+      left[link.target] += link.value * scale;
+      final middle = (from.right + to.left) / 2;
+      final band = Path()
+        ..moveTo(from.right, y0)
+        ..cubicTo(middle, y0, middle, y1, to.left, y1)
+        ..lineTo(to.left, y1 + thick)
+        ..cubicTo(
+          middle,
+          y1 + thick,
+          middle,
+          y0 + thick,
+          from.right,
+          y0 + thick,
+        )
+        ..close();
+      final paint = Paint()
+        ..color = palette[link.source % palette.length].withValues(alpha: 0.35);
+      ops.add((canvas) => canvas.drawPath(band, paint));
+    }
+    for (var i = 0; i < count; i++) {
+      final bar = bars[i];
+      final paint = Paint()..color = palette[i % palette.length];
+      final label = labels[i];
+      final at = Offset(bar.right + 6, bar.center.dy - label.height / 2);
+      ops.add((canvas) {
+        canvas.drawRect(bar, paint);
+        label.paint(canvas, at);
+      });
+    }
+    return (
+      Size(right + _pad, bottom + _pad),
+      'Sankey diagram: ${[for (final link in links) '${sankey.nodes[link.source]} to ${sankey.nodes[link.target]} ${_plain(link.value)}'].join(', ')}',
+    );
+  }
+
+  // ---- xy chart -----------------------------------------------------
+
+  (Size, String) _xyChart(XyChart chart) {
+    final palette = _colors;
+    final small = _small;
+    final title = _titleOf(chart.title);
+    final categories = chart.categories;
+    final count =
+        categories?.length ??
+        chart.series
+            .map((series) => series.values.length)
+            .fold<int>(0, math.max);
+    final xRange = chart.xRange;
+    final names = [
+      for (var k = 0; k < count; k++)
+        measure(
+          categories != null
+              ? categories[k]
+              : xRange == null
+              ? '${k + 1}'
+              : _plain(
+                  count == 1
+                      ? xRange.$1
+                      : xRange.$1 + (xRange.$2 - xRange.$1) * k / (count - 1),
+                ),
+          style: small,
+          maxWidth: 70,
+        ),
+    ];
+    final all = [
+      for (final series in chart.series) ...series.values.take(count),
+    ];
+    var low = chart.yRange?.$1 ?? all.fold<double>(0, math.min);
+    var high = chart.yRange?.$2 ?? all.fold<double>(low, math.max);
+    if (high <= low) high = low + 1;
+    const plotHeight = 170.0;
+    const steps = 4;
+    final ticks = [
+      for (var k = 0; k <= steps; k++)
+        measure(_plain(low + (high - low) * k / steps), style: small),
+    ];
+    final xTitle = chart.xTitle == null
+        ? null
+        : measure(chart.xTitle!, style: small, maxWidth: 200);
+    final yTitle = chart.yTitle == null
+        ? null
+        : measure(chart.yTitle!, style: small, maxWidth: plotHeight);
+    final band = [
+      36.0,
+      220 / count,
+      names.map((name) => name.width).fold(0.0, math.max) + 10,
+    ].reduce(math.max);
+    var top = _pad;
+    final left =
+        _pad +
+        (yTitle == null ? 0 : yTitle.height + 6) +
+        ticks.map((tick) => tick.width).fold(0.0, math.max) +
+        6;
+    var right = left + band * count;
+    if (title != null) {
+      final at = Offset(_pad, top);
+      ops.add((canvas) => title.paint(canvas, at));
+      right = math.max(right, _pad + title.width);
+      top += title.height + 10;
+    }
+    // room for the top tick's text
+    top += ticks.last.height / 2;
+    final bottom = top + plotHeight;
+    final plotRight = left + band * count;
+    double yOf(double value) =>
+        bottom - (value.clamp(low, high) - low) / (high - low) * plotHeight;
+
+    final grid = stroke(line.withValues(alpha: line.a * 0.3), 1);
+    for (var k = 0; k <= steps; k++) {
+      final y = bottom - plotHeight * k / steps;
+      final tick = ticks[k];
+      if (k > 0) {
+        ops.add(
+          (canvas) =>
+              canvas.drawLine(Offset(left, y), Offset(plotRight, y), grid),
+        );
+      }
+      drawText(tick, Offset(left - 6 - tick.width / 2, y));
+    }
+    // bars stand side by side in their category, on the zero line (or on
+    // the bottom when zero is out of range)
+    final barSeries = [
+      for (var s = 0; s < chart.series.length; s++)
+        if (chart.series[s].bar) s,
+    ];
+    final base = yOf(0);
+    for (var b = 0; b < barSeries.length; b++) {
+      final series = chart.series[barSeries[b]];
+      final paint = Paint()..color = palette[barSeries[b] % palette.length];
+      final width = band * 0.7 / barSeries.length;
+      for (var k = 0; k < series.values.length && k < count; k++) {
+        final x = left + k * band + band * 0.15 + b * width;
+        final y = yOf(series.values[k]);
+        final bar = Rect.fromLTRB(
+          x,
+          math.min(y, base),
+          x + width,
+          math.max(y, base),
+        );
+        ops.add((canvas) => canvas.drawRect(bar, paint));
+      }
+    }
+    final axes = stroke(line, 1);
+    final frame = Path()
+      ..moveTo(left, top)
+      ..lineTo(left, bottom)
+      ..lineTo(plotRight, bottom);
+    ops.add((canvas) => canvas.drawPath(frame, axes));
+    // lines go over the bars, through the middle of each category
+    for (var s = 0; s < chart.series.length; s++) {
+      final series = chart.series[s];
+      if (series.bar) continue;
+      final color = palette[s % palette.length];
+      final points = [
+        for (var k = 0; k < series.values.length && k < count; k++)
+          Offset(left + k * band + band / 2, yOf(series.values[k])),
+      ];
+      if (points.isEmpty) continue;
+      final path = Path()..moveTo(points.first.dx, points.first.dy);
+      for (final point in points.skip(1)) {
+        path.lineTo(point.dx, point.dy);
+      }
+      final pen = stroke(color, 2);
+      final dot = Paint()..color = color;
+      ops.add((canvas) {
+        canvas.drawPath(path, pen);
+        for (final point in points) {
+          canvas.drawCircle(point, 3, dot);
+        }
+      });
+    }
+    var below = bottom + 4;
+    for (var k = 0; k < count; k++) {
+      drawText(
+        names[k],
+        Offset(left + k * band + band / 2, bottom + 4 + names[k].height / 2),
+      );
+      below = math.max(below, bottom + 4 + names[k].height);
+    }
+    if (xTitle != null) {
+      drawText(
+        xTitle,
+        Offset((left + plotRight) / 2, below + 4 + xTitle.height / 2),
+      );
+      below += 4 + xTitle.height;
+      right = math.max(right, (left + plotRight) / 2 + xTitle.width / 2);
+    }
+    if (yTitle != null) {
+      drawTextTurned(
+        yTitle,
+        Offset(_pad + yTitle.height / 2, top + plotHeight / 2),
+      );
+    }
+    return (
+      Size(right + _pad, below + _pad),
+      'XY chart${chart.title == null ? '' : ' ${chart.title}'}: '
+          '${[for (final series in chart.series) '${series.bar ? 'bar' : 'line'} ${series.values.take(count).map(_plain).join(', ')}'].join('; ')}',
+    );
+  }
+}
+
+// a number as short as it can be written: no ".0", at most two decimals
+String _plain(double value) {
+  final text = value.toStringAsFixed(2);
+  return text.contains('.') ? text.replaceFirst(RegExp(r'\.?0+$'), '') : text;
 }
 
 Path _dash(Path source, {double on = 5, double off = 4}) {

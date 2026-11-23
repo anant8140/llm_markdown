@@ -787,6 +787,32 @@ void main() {
         'pie title Pets\n"Dogs" : 3\n"Cats" : 1\n',
         'gantt\n  dateFormat X\n  excludes weekends\n  A :a, 1704412800, 3d\n'
             '  B :until a\n  C :after a, 2M\n',
+        // styling lines
+        'flowchart LR\n  A[One]:::hot --> B --> C\n'
+            '  classDef hot fill:#f9f,stroke:#333,stroke-width:4px\n'
+            '  classDef cold fill:navy,color:white,stroke-dasharray: 5 5\n'
+            '  class B,C cold\n  style C fill:#fff8,stroke:teal\n'
+            '  linkStyle 0 stroke:#f00,stroke-width:2px\n'
+            '  linkStyle default stroke:gray\n',
+        'stateDiagram-v2\n  classDef bad fill:#f00,color:white\n'
+            '  [*] --> Idle\n  Idle --> Broken:::bad\n  class Idle bad\n',
+        'classDiagram\n  class Animal:::soft\n  Animal <|-- Duck\n'
+            '  cssClass "Duck" soft\n  classDef soft fill:#eee\n'
+            '  style Animal stroke:red\n',
+        // the newer kinds
+        'gitGraph\n  commit id: "a"\n  branch dev\n  commit tag: "v1"\n'
+            '  checkout main\n  commit type: REVERSE\n'
+            '  merge dev type: HIGHLIGHT\n',
+        'journey\n  title Day\n  section Morning\n    Tea: 5: Me\n'
+            '    Work: 1: Me, Cat\n',
+        'quadrantChart\n  title Reach\n  x-axis Low --> High\n'
+            '  y-axis Bad --> Good\n  quadrant-1 Expand\n  quadrant-3 Drop\n'
+            '  A: [0.3, 0.6]\n  B: [0.9, 0.1]\n',
+        'sankey-beta\nCoal,Power,30\nGas,Power,10\n'
+            'Power,"Homes, all",25\nPower,Coal,5\n',
+        'xychart-beta\n  title "Sales"\n  x-axis [jan, feb, mar]\n'
+            '  y-axis "Revenue" 0 --> 100\n  bar [25, 50, 100]\n'
+            '  line [10, 90, 40]\n',
       ];
       final random = math.Random(7);
       const junk = '[](){}<>|:;-.=o*"%#\n x1u';
@@ -1541,7 +1567,9 @@ timeline
       expect(parseMermaid('pie\n'), isNull);
       expect(parseMermaid('stateDiagram-v2\n'), isNull);
       expect(parseMermaid('classDiagram\n'), isNull);
+      // a journey without a task; a kind that isn't drawn
       expect(MermaidDiagram.supports('journey\n  title Day'), isFalse);
+      expect(MermaidDiagram.supports('requirementDiagram\n  x'), isFalse);
       expect(MermaidDiagram.supports('erDiagram\n A ||--o{ B : has'), isTrue);
       expect(MermaidDiagram.supports('classDiagram\n A <|-- B'), isTrue);
       expect(MermaidDiagram.supports('graph TD; A-->B'), isTrue);

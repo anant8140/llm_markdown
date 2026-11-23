@@ -1,7 +1,8 @@
 // A small reader for the Mermaid diagrams that chat models write most:
 // flowcharts (with subgraphs), state diagrams (with composite states and
 // notes), class diagrams (with notes and cardinalities), ER diagrams,
-// sequence diagrams, pie charts, gantt charts, mindmaps and timelines.
+// sequence diagrams, pie charts, gantt charts, mindmaps, timelines, git
+// graphs, user journeys, quadrant charts, sankey diagrams and xy charts.
 // Anything else, or anything these readers can't follow, returns null and
 // is shown as code.
 
@@ -47,6 +48,45 @@ enum EdgeHead {
   zeroOrMany,
 }
 
+// The look a diagram gives a node (classDef, class, ":::", style) or an
+// edge (linkStyle). Colors are 0xAARRGGBB; what the text doesn't set is
+// null and drawn in the theme's colors.
+class FlowStyle {
+  const FlowStyle({
+    this.fill,
+    this.stroke,
+    this.color,
+    this.strokeWidth,
+    this.dashed,
+  });
+
+  final int? fill;
+  final int? stroke;
+
+  // the text's color
+  final int? color;
+  final double? strokeWidth;
+
+  // set by stroke-dasharray
+  final bool? dashed;
+
+  bool get isEmpty =>
+      fill == null &&
+      stroke == null &&
+      color == null &&
+      strokeWidth == null &&
+      dashed == null;
+
+  // this style with what [over] sets on top of it
+  FlowStyle merge(FlowStyle over) => FlowStyle(
+    fill: over.fill ?? fill,
+    stroke: over.stroke ?? stroke,
+    color: over.color ?? color,
+    strokeWidth: over.strokeWidth ?? strokeWidth,
+    dashed: over.dashed ?? dashed,
+  );
+}
+
 class FlowNode {
   FlowNode(this.id) : label = id;
 
@@ -59,6 +99,9 @@ class FlowNode {
 
   // for a class: "interface", "abstract", ...
   String? annotation;
+
+  // from classDef, class, ":::" and style lines
+  FlowStyle? style;
 }
 
 class FlowEdge {
@@ -71,6 +114,7 @@ class FlowEdge {
     this.tail = EdgeHead.none,
     this.fromLabel,
     this.toLabel,
+    this.style,
   });
 
   final String from;
@@ -87,6 +131,21 @@ class FlowEdge {
 
   // at [from]
   final EdgeHead tail;
+
+  // from a linkStyle line
+  final FlowStyle? style;
+
+  FlowEdge styled(FlowStyle style) => FlowEdge(
+    from,
+    to,
+    label: label,
+    line: line,
+    head: head,
+    tail: tail,
+    fromLabel: fromLabel,
+    toLabel: toLabel,
+    style: style,
+  );
 }
 
 enum FlowKind { flowchart, state, classes, entities }
@@ -263,6 +322,143 @@ class Timeline extends MermaidData {
   final List<TimelinePeriod> periods;
 }
 
+enum GitCommitType { normal, reverse, highlight }
+
+class GitCommit {
+  const GitCommit(
+    this.branch, {
+    this.parents = const [],
+    this.label,
+    this.tag,
+    this.type = GitCommitType.normal,
+    this.merge = false,
+  });
+
+  // an index into [GitGraph.branches]
+  final int branch;
+
+  // indexes into [GitGraph.commits]: the commit before it on its branch
+  // (or the one it branched from), then for a merge the one merged in
+  final List<int> parents;
+
+  // its "id:" as written; null when the text gives none
+  final String? label;
+  final String? tag;
+  final GitCommitType type;
+  final bool merge;
+}
+
+class GitGraph extends MermaidData {
+  const GitGraph(this.branches, this.commits);
+
+  // "main" first, then the others in the order they were made
+  final List<String> branches;
+  final List<GitCommit> commits;
+}
+
+class JourneyTask {
+  const JourneyTask(
+    this.name,
+    this.score, {
+    this.actors = const [],
+    this.section,
+  });
+
+  final String name;
+
+  // 1 (bad) to 5 (good)
+  final int score;
+  final List<String> actors;
+  final String? section;
+}
+
+class Journey extends MermaidData {
+  const Journey(this.title, this.tasks);
+
+  final String? title;
+  final List<JourneyTask> tasks;
+}
+
+class QuadrantPoint {
+  const QuadrantPoint(this.name, this.x, this.y);
+
+  final String name;
+
+  // 0 to 1, from the left and from the bottom
+  final double x;
+  final double y;
+}
+
+class QuadrantChart extends MermaidData {
+  const QuadrantChart(
+    this.title,
+    this.quadrants,
+    this.points, {
+    this.xLow,
+    this.xHigh,
+    this.yLow,
+    this.yHigh,
+  });
+
+  final String? title;
+
+  // quadrant-1 to quadrant-4: top right, top left, bottom left, bottom
+  // right
+  final List<String?> quadrants;
+  final List<QuadrantPoint> points;
+  final String? xLow;
+  final String? xHigh;
+  final String? yLow;
+  final String? yHigh;
+}
+
+class SankeyLink {
+  const SankeyLink(this.source, this.target, this.value);
+
+  // indexes into [Sankey.nodes]
+  final int source;
+  final int target;
+  final double value;
+}
+
+class Sankey extends MermaidData {
+  const Sankey(this.nodes, this.links);
+
+  final List<String> nodes;
+  final List<SankeyLink> links;
+}
+
+class XySeries {
+  const XySeries(this.values, {required this.bar});
+
+  final List<double> values;
+
+  // bars, or a line
+  final bool bar;
+}
+
+class XyChart extends MermaidData {
+  const XyChart(
+    this.series, {
+    this.title,
+    this.xTitle,
+    this.yTitle,
+    this.categories,
+    this.xRange,
+    this.yRange,
+  });
+
+  final List<XySeries> series;
+  final String? title;
+  final String? xTitle;
+  final String? yTitle;
+
+  // the names along the x axis, or null for numbers ([xRange], or 1, 2 ...)
+  final List<String>? categories;
+  final (double, double)? xRange;
+  final (double, double)? yRange;
+}
+
 final RegExp _comment = RegExp(r'%%.*$', multiLine: true);
 final RegExp _lineBreak = RegExp(r'<br\s*/?>', caseSensitive: false);
 
@@ -311,6 +507,21 @@ MermaidData? parseMermaid(String source) {
   if (RegExp(r'^mindmap\s*$').hasMatch(head)) return _mindmap(raw.skip(1));
   if (RegExp(r'^timeline\s*$').hasMatch(head)) {
     return _timeline(lines.skip(1));
+  }
+  if (RegExp(r'^gitGraph\s*(?:LR|TB|BT)?\s*:?$').hasMatch(head)) {
+    return _gitGraph(lines.skip(1));
+  }
+  if (RegExp(r'^journey\s*$').hasMatch(head)) return _journey(lines.skip(1));
+  if (RegExp(r'^quadrantChart\s*$').hasMatch(head)) {
+    return _quadrant(lines.skip(1));
+  }
+  if (RegExp(r'^sankey(?:-beta)?\s*$').hasMatch(head)) {
+    return _sankey(lines.skip(1));
+  }
+  if (RegExp(
+    r'^xychart(?:-beta)?(?:\s+(?:horizontal|vertical))?\s*$',
+  ).hasMatch(head)) {
+    return _xyChart(lines.skip(1));
   }
   return null;
 }
@@ -374,6 +585,7 @@ FlowChart? _flowChart(String? direction, List<String> lines) {
   final groups = <String, FlowGroup>{};
   // the subgraphs the line is inside, innermost last
   final open = <FlowGroup>[];
+  final styling = _Styling();
 
   FlowNode newNode(String id) {
     // a node belongs to the innermost subgraph it is first mentioned in
@@ -406,6 +618,7 @@ FlowChart? _flowChart(String? direction, List<String> lines) {
         if (open.isNotEmpty) open.removeLast();
         continue;
       }
+      if (styling.read(text)) continue;
       if (_ignoredFlow.any(
         (word) => text == word.trim() || text.startsWith(word),
       )) {
@@ -436,8 +649,11 @@ FlowChart? _flowChart(String? direction, List<String> lines) {
             break;
           }
           // A:::someClass
-          final styled = RegExp(r':::[\w-]+').matchAsPrefix(text, at);
-          if (styled != null) at = styled.end;
+          final styled = RegExp(r':::([\w-]+)').matchAsPrefix(text, at);
+          if (styled != null) {
+            styling.tag(node.id, styled[1]!);
+            at = styled.end;
+          }
           final and = RegExp(r'\s*&\s*').matchAsPrefix(text, at);
           ids.add(node.id);
           if (and == null) return ids;
@@ -485,6 +701,9 @@ FlowChart? _flowChart(String? direction, List<String> lines) {
     }
   }
   if (nodes.isEmpty) return null;
+  styling
+    ..apply(nodes.values)
+    ..applyLinks(edges);
   // An edge to a subgraph's id (A --> sub1) is drawn to the subgraph's box,
   // as Mermaid does: such an id is kept as a node here, and the view draws
   // the box in its place.
@@ -541,6 +760,7 @@ FlowChart? _state(Iterable<String> lines) {
   // a note on several lines: its target, side and lines so far
   RegExpMatch? noteHead;
   final noteLines = <String>[];
+  final styling = _Styling();
 
   FlowNode made(String id) {
     // a state belongs to the innermost composite it is first mentioned in
@@ -562,7 +782,8 @@ FlowChart? _state(Iterable<String> lines) {
   NoteSide side(String word) =>
       word.toLowerCase() == 'left' ? NoteSide.left : NoteSide.right;
 
-  for (final line in lines) {
+  for (final written in lines) {
+    var line = written;
     if (inNote) {
       if (RegExp(r'^end\s+note$', caseSensitive: false).hasMatch(line)) {
         inNote = false;
@@ -589,6 +810,8 @@ FlowChart? _state(Iterable<String> lines) {
       }
       continue;
     }
+    if (styling.read(line)) continue;
+    line = styling.untag(line);
     final turned = _directionLine.firstMatch(line);
     if (turned != null) {
       if (scope.isEmpty) direction = turned[1];
@@ -647,10 +870,11 @@ FlowChart? _state(Iterable<String> lines) {
       continue;
     }
     if (_stateId.hasMatch(line) && line != '[*]') node(line, from: true);
-    // "--" between concurrent regions, classDef, class, style ... change
-    // nothing drawn here
+    // "--" between concurrent regions and the like change nothing drawn
+    // here
   }
   if (nodes.isEmpty) return null;
+  styling.apply(nodes.values);
   for (final state in nodes.values) {
     if (state.shape == NodeShape.rect && state.label.isNotEmpty) {
       state.shape = NodeShape.rounded;
@@ -708,6 +932,7 @@ FlowChart? _classes(Iterable<String> lines) {
   String? direction;
   FlowNode? open;
   final notes = <FlowNote>[];
+  final styling = _Styling();
 
   FlowNode classNode(String raw) {
     final id = raw.replaceAll(RegExp(r'~[^~]*~'), '');
@@ -719,7 +944,8 @@ FlowChart? _classes(Iterable<String> lines) {
     return node;
   }
 
-  for (final line in lines) {
+  for (final written in lines) {
+    var line = written;
     if (open != null) {
       if (line == '}') {
         open = null;
@@ -733,6 +959,8 @@ FlowChart? _classes(Iterable<String> lines) {
       }
       continue;
     }
+    if (styling.read(line, classLines: false)) continue;
+    line = styling.untag(line);
     final turned = _directionLine.firstMatch(line);
     if (turned != null) {
       direction = turned[1];
@@ -793,9 +1021,10 @@ FlowChart? _classes(Iterable<String> lines) {
       classNode(member[1]!).members.add(_label(member[2]!));
       continue;
     }
-    // note, link, click, style, cssClass ... change nothing drawn here
+    // link, click, callback ... change nothing drawn here
   }
   if (nodes.isEmpty) return null;
+  styling.apply(nodes.values);
   return FlowChart(
     _direction(direction),
     nodes.values.toList(),
@@ -1535,6 +1764,553 @@ Timeline? _timeline(Iterable<String> lines) {
   }
   if (periods.isEmpty) return null;
   return Timeline(title, periods);
+}
+
+// ---- colors and styling -----------------------------------------------
+
+const _cssColors = {
+  'red': 0xFFFF0000,
+  'green': 0xFF008000,
+  'blue': 0xFF0000FF,
+  'yellow': 0xFFFFFF00,
+  'orange': 0xFFFFA500,
+  'purple': 0xFF800080,
+  'pink': 0xFFFFC0CB,
+  'gray': 0xFF808080,
+  'grey': 0xFF808080,
+  'black': 0xFF000000,
+  'white': 0xFFFFFFFF,
+  'cyan': 0xFF00FFFF,
+  'aqua': 0xFF00FFFF,
+  'magenta': 0xFFFF00FF,
+  'brown': 0xFFA52A2A,
+  'teal': 0xFF008080,
+  'navy': 0xFF000080,
+  'lime': 0xFF00FF00,
+  'gold': 0xFFFFD700,
+  'silver': 0xFFC0C0C0,
+  'lightgray': 0xFFD3D3D3,
+  'lightgrey': 0xFFD3D3D3,
+  'darkgray': 0xFFA9A9A9,
+  'darkgrey': 0xFFA9A9A9,
+  'lightblue': 0xFFADD8E6,
+  'lightgreen': 0xFF90EE90,
+  'lightyellow': 0xFFFFFFE0,
+  'darkblue': 0xFF00008B,
+  'darkgreen': 0xFF006400,
+  'darkred': 0xFF8B0000,
+  'transparent': 0x00000000,
+  'none': 0x00000000,
+};
+
+final RegExp _hexColor = RegExp(r'^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$');
+
+/// Reads a CSS color written as #rgb, #rgba, #rrggbb, #rrggbbaa or one of
+/// the common names, as 0xAARRGGBB; null for anything else.
+int? parseCssColor(String text) {
+  final value = text.trim().toLowerCase();
+  final named = _cssColors[value];
+  if (named != null) return named;
+  var hex = _hexColor.firstMatch(value)?[1];
+  if (hex == null) return null;
+  if (hex.length <= 4) {
+    hex = [for (final digit in hex.split('')) '$digit$digit'].join();
+  }
+  final rgb = int.parse(hex.substring(0, 6), radix: 16);
+  final alpha = hex.length == 8 ? int.parse(hex.substring(6), radix: 16) : 255;
+  return alpha << 24 | rgb;
+}
+
+final RegExp _cssNumber = RegExp(r'^(\d+(?:\.\d+)?|\.\d+)(?:px)?$');
+
+// "fill:#f9f,stroke:#333,stroke-width:2px"; properties and values it
+// doesn't know are left out, and it is null when nothing is left.
+FlowStyle? _flowStyle(String text) {
+  int? fill;
+  int? stroke;
+  int? color;
+  double? strokeWidth;
+  bool? dashed;
+  for (final part in text.split(',')) {
+    final colon = part.indexOf(':');
+    if (colon == -1) continue;
+    // "interpolate basis stroke:#f00": the property is the last word
+    final property = part
+        .substring(0, colon)
+        .trim()
+        .split(RegExp(r'\s+'))
+        .last
+        .toLowerCase();
+    final value = part
+        .substring(colon + 1)
+        .replaceAll('!important', '')
+        .replaceAll(';', '')
+        .trim()
+        .toLowerCase();
+    switch (property) {
+      case 'fill':
+        fill = parseCssColor(value) ?? fill;
+      case 'stroke':
+        stroke = parseCssColor(value) ?? stroke;
+      case 'color':
+        color = parseCssColor(value) ?? color;
+      case 'stroke-width':
+        final number = _cssNumber.firstMatch(value)?[1];
+        if (number != null) {
+          strokeWidth = math.min(double.parse(number), 12);
+        }
+      case 'stroke-dasharray':
+        dashed = value.isNotEmpty && value != 'none' && value != '0';
+    }
+  }
+  final style = FlowStyle(
+    fill: fill,
+    stroke: stroke,
+    color: color,
+    strokeWidth: strokeWidth,
+    dashed: dashed,
+  );
+  return style.isEmpty ? null : style;
+}
+
+const _styledId = r'[\w\u0080-￿.-]+';
+final RegExp _classDefLine = RegExp(
+  r'^classDef\s+([\w-]+(?:\s*,\s*[\w-]+)*)\s+(.+)$',
+);
+final RegExp _classLine = RegExp(
+  '^(class|cssClass)\\s+"?($_styledId(?:\\s*,\\s*$_styledId)*)"?\\s+([\\w-]+)\$',
+);
+final RegExp _styleLine = RegExp(
+  '^style\\s+($_styledId(?:\\s*,\\s*$_styledId)*)\\s+(.*:.*)\$',
+);
+final RegExp _linkStyleLine = RegExp(
+  r'^linkStyle\s+(default|\d+(?:\s*,\s*\d+)*)\s+(.*:.*)$',
+);
+final RegExp _classTag = RegExp('($_styledId):::([\\w-]+)');
+
+// What classDef, class, ":::", style and linkStyle lines say, kept until
+// the whole diagram is read: a class may be used before it is defined.
+class _Styling {
+  final _defs = <String, FlowStyle>{};
+  final _classes = <String, List<String>>{};
+  final _direct = <String, FlowStyle>{};
+  final _links = <int, FlowStyle>{};
+  FlowStyle? _defaultLink;
+
+  void tag(String id, String name) =>
+      _classes.putIfAbsent(id, () => []).add(name);
+
+  // "A:::name" is read as "A", and the class kept
+  String untag(String line) => line.replaceAllMapped(_classTag, (match) {
+    tag(match[1]!, match[2]!);
+    return match[1]!;
+  });
+
+  // Whether [line] was a styling line. "class A,B name" is one only where
+  // [classLines] is set: in a class diagram "class" starts a class.
+  bool read(String line, {bool classLines = true}) {
+    final def = _classDefLine.firstMatch(line);
+    if (def != null) {
+      final style = _flowStyle(def[2]!);
+      if (style != null) {
+        for (final name in def[1]!.split(',')) {
+          final key = name.trim();
+          _defs[key] = _defs[key]?.merge(style) ?? style;
+        }
+      }
+      return true;
+    }
+    final use = _classLine.firstMatch(line);
+    if (use != null && (classLines || use[1] == 'cssClass')) {
+      for (final id in use[2]!.split(',')) {
+        tag(id.trim(), use[3]!);
+      }
+      return true;
+    }
+    final direct = _styleLine.firstMatch(line);
+    if (direct != null) {
+      final style = _flowStyle(direct[2]!);
+      if (style != null) {
+        for (final id in direct[1]!.split(',')) {
+          final key = id.trim();
+          _direct[key] = _direct[key]?.merge(style) ?? style;
+        }
+      }
+      return true;
+    }
+    final link = _linkStyleLine.firstMatch(line);
+    if (link != null) {
+      final style = _flowStyle(link[2]!);
+      if (style == null) return true;
+      if (link[1] == 'default') {
+        _defaultLink = _defaultLink?.merge(style) ?? style;
+      } else {
+        for (final number in link[1]!.split(',')) {
+          final index = int.tryParse(number.trim());
+          if (index == null) continue;
+          _links[index] = _links[index]?.merge(style) ?? style;
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // The class "default" first, then the node's classes in the order they
+  // were given, then its own style line.
+  void apply(Iterable<FlowNode> nodes) {
+    for (final node in nodes) {
+      var style = _defs['default'];
+      for (final name in _classes[node.id] ?? const <String>[]) {
+        final next = _defs[name];
+        if (next != null) style = style?.merge(next) ?? next;
+      }
+      final own = _direct[node.id];
+      if (own != null) style = style?.merge(own) ?? own;
+      node.style = style;
+    }
+  }
+
+  void applyLinks(List<FlowEdge> edges) {
+    for (var i = 0; i < edges.length; i++) {
+      var style = _defaultLink;
+      final own = _links[i];
+      if (own != null) style = style?.merge(own) ?? own;
+      if (style != null) edges[i] = edges[i].styled(style);
+    }
+  }
+}
+
+// a number a drawing can be scaled by: finite and not huge
+double? _number(String text) {
+  final value = double.tryParse(text.trim());
+  return value == null || !value.isFinite || value.abs() > 1e12 ? null : value;
+}
+
+// ---- git graphs -------------------------------------------------------
+
+final RegExp _gitLine = RegExp(
+  r'^(commit|branch|checkout|switch|merge|cherry-pick)(?:\s+(.*))?$',
+);
+final RegExp _gitAttribute = RegExp(
+  r'\b(id|tag|type|msg|order|parent)\s*:\s*(?:"([^"]*)"|(\S+))',
+);
+final RegExp _gitName = RegExp(r'^(?:"([^"]+)"|([^\s:"]+))(?=\s|$)');
+
+GitGraph? _gitGraph(Iterable<String> lines) {
+  final branches = <String>['main'];
+  // the last commit of each branch
+  final heads = <int?>[null];
+  final commits = <GitCommit>[];
+  var current = 0;
+
+  void add(String rest, {int? other, String? tag}) {
+    String? label;
+    final tags = <String>[];
+    if (tag != null) tags.add(tag);
+    var type = GitCommitType.normal;
+    for (final match in _gitAttribute.allMatches(rest)) {
+      final value = match[2] ?? match[3]!;
+      switch (match[1]) {
+        case 'id':
+          // a cherry-pick's id is the commit it copies, not its own
+          if (tag == null && value.isNotEmpty) label = value;
+        case 'tag':
+          if (value.isNotEmpty) tags.add(value);
+        case 'type':
+          type = switch (value.toUpperCase()) {
+            'REVERSE' => GitCommitType.reverse,
+            'HIGHLIGHT' => GitCommitType.highlight,
+            _ => GitCommitType.normal,
+          };
+      }
+    }
+    final head = heads[current];
+    commits.add(
+      GitCommit(
+        current,
+        parents: [head, other].nonNulls.toList(),
+        label: label,
+        tag: tags.isEmpty ? null : tags.join(', '),
+        type: type,
+        merge: other != null,
+      ),
+    );
+    heads[current] = commits.length - 1;
+  }
+
+  for (final line in lines) {
+    final match = _gitLine.firstMatch(line);
+    if (match == null) continue;
+    final rest = (match[2] ?? '').trim();
+    final named = _gitName.firstMatch(rest);
+    final name = named?[1] ?? named?[2];
+    switch (match[1]) {
+      case 'commit':
+        add(rest);
+      case 'cherry-pick':
+        final picked = _gitAttribute
+            .allMatches(rest)
+            .where((m) => m[1] == 'id')
+            .firstOrNull;
+        final id = picked?[2] ?? picked?[3];
+        if (id != null && id.isNotEmpty) add(rest, tag: 'cherry-pick: $id');
+      case 'branch':
+        if (name == null) continue;
+        final at = branches.indexOf(name);
+        if (at != -1) {
+          current = at;
+        } else {
+          branches.add(name);
+          heads.add(heads[current]);
+          current = branches.length - 1;
+        }
+      case 'checkout' || 'switch':
+        final at = name == null ? -1 : branches.indexOf(name);
+        if (at != -1) current = at;
+      case 'merge':
+        final at = name == null ? -1 : branches.indexOf(name);
+        final other = at == -1 || at == current ? null : heads[at];
+        if (other == null || other == heads[current]) continue;
+        add(rest.substring(named!.end), other: other);
+    }
+  }
+  if (commits.isEmpty) return null;
+  return GitGraph(branches, commits);
+}
+
+// ---- user journeys ----------------------------------------------------
+
+final RegExp _journeyTask = RegExp(
+  r'^([^:]+?)\s*:\s*(-?\d{1,9})\s*(?::\s*(.*))?$',
+);
+final RegExp _titled = RegExp(r'^(title|section)(?:\s+(.*))?$');
+
+Journey? _journey(Iterable<String> lines) {
+  String? title;
+  String? section;
+  final tasks = <JourneyTask>[];
+  for (final line in lines) {
+    final word = _titled.firstMatch(line);
+    if (word != null) {
+      final text = _label(word[2] ?? '');
+      if (word[1] == 'title') {
+        title = text.isEmpty ? null : text;
+      } else {
+        section = text.isEmpty ? null : text;
+      }
+      continue;
+    }
+    final task = _journeyTask.firstMatch(line);
+    if (task == null) continue;
+    tasks.add(
+      JourneyTask(
+        _label(task[1]!),
+        int.parse(task[2]!).clamp(1, 5),
+        actors: [
+          for (final actor in (task[3] ?? '').split(','))
+            if (actor.trim().isNotEmpty) actor.trim(),
+        ],
+        section: section,
+      ),
+    );
+  }
+  if (tasks.isEmpty) return null;
+  return Journey(title, tasks);
+}
+
+// ---- quadrant charts --------------------------------------------------
+
+final RegExp _axisLine = RegExp(r'^([xy])-axis\s+(.+)$');
+final RegExp _quadrantName = RegExp(r'^quadrant-([1-4])\s+(.+)$');
+final RegExp _quadrantPoint = RegExp(
+  r'^(.+?)(?::::[\w-]+)?\s*:\s*\[\s*([^,\]\s]+)\s*,\s*([^,\]\s]+)\s*\]',
+);
+
+QuadrantChart? _quadrant(Iterable<String> lines) {
+  String? title;
+  final axes = <String, (String?, String?)>{};
+  final quadrants = List<String?>.filled(4, null);
+  final points = <QuadrantPoint>[];
+  for (final line in lines) {
+    final word = _titled.firstMatch(line);
+    if (word != null && word[1] == 'title') {
+      final text = _label(word[2] ?? '');
+      title = text.isEmpty ? null : text;
+      continue;
+    }
+    final axis = _axisLine.firstMatch(line);
+    if (axis != null) {
+      final ends = axis[2]!.split('-->');
+      String? end(int k) {
+        final text = k < ends.length ? _label(ends[k]) : '';
+        return text.isEmpty ? null : text;
+      }
+
+      axes[axis[1]!] = (end(0), end(1));
+      continue;
+    }
+    final quadrant = _quadrantName.firstMatch(line);
+    if (quadrant != null) {
+      quadrants[int.parse(quadrant[1]!) - 1] = _label(quadrant[2]!);
+      continue;
+    }
+    final point = _quadrantPoint.firstMatch(line);
+    if (point == null) continue;
+    final x = _number(point[2]!);
+    final y = _number(point[3]!);
+    if (x == null || y == null) continue;
+    points.add(
+      QuadrantPoint(_label(point[1]!), x.clamp(0.0, 1.0), y.clamp(0.0, 1.0)),
+    );
+  }
+  if (points.isEmpty && quadrants.every((name) => name == null)) return null;
+  return QuadrantChart(
+    title,
+    quadrants,
+    points,
+    xLow: axes['x']?.$1,
+    xHigh: axes['x']?.$2,
+    yLow: axes['y']?.$1,
+    yHigh: axes['y']?.$2,
+  );
+}
+
+// ---- sankey diagrams --------------------------------------------------
+
+// One CSV row: fields between commas; a field in double quotes may hold
+// commas, and "" inside it is a quote. Null for a quote left open.
+List<String>? _csvFields(String row) {
+  final fields = <String>[];
+  final field = StringBuffer();
+  var quoted = false;
+  for (var at = 0; at < row.length; at++) {
+    final char = row[at];
+    if (quoted) {
+      if (char != '"') {
+        field.write(char);
+      } else if (at + 1 < row.length && row[at + 1] == '"') {
+        field.write('"');
+        at++;
+      } else {
+        quoted = false;
+      }
+    } else if (char == '"' && field.toString().trim().isEmpty) {
+      field.clear();
+      quoted = true;
+    } else if (char == ',') {
+      fields.add(field.toString().trim());
+      field.clear();
+    } else {
+      field.write(char);
+    }
+  }
+  if (quoted) return null;
+  fields.add(field.toString().trim());
+  return fields;
+}
+
+Sankey? _sankey(Iterable<String> lines) {
+  final nodes = <String>[];
+  final links = <SankeyLink>[];
+  int node(String name) {
+    final at = nodes.indexOf(name);
+    if (at != -1) return at;
+    nodes.add(name);
+    return nodes.length - 1;
+  }
+
+  for (final line in lines) {
+    final fields = _csvFields(line);
+    if (fields == null || fields.length != 3) continue;
+    final value = _number(fields[2]);
+    if (value == null || value <= 0) continue;
+    if (fields[0].isEmpty || fields[1].isEmpty || fields[0] == fields[1]) {
+      continue;
+    }
+    links.add(SankeyLink(node(fields[0]), node(fields[1]), value));
+  }
+  if (links.isEmpty) return null;
+  return Sankey(nodes, links);
+}
+
+// ---- xy charts --------------------------------------------------------
+
+final RegExp _xyRange = RegExp(r'^(.*?)\s*(-?[\d.]+)\s*-->\s*(-?[\d.]+)$');
+final RegExp _xySeries = RegExp(r'^(bar|line)\b[^\[]*\[([^\]]*)\]$');
+
+XyChart? _xyChart(Iterable<String> lines) {
+  String? title;
+  String? xTitle;
+  String? yTitle;
+  List<String>? categories;
+  (double, double)? xRange;
+  (double, double)? yRange;
+  final series = <XySeries>[];
+  String? named(String raw) {
+    final text = _label(raw);
+    return text.isEmpty ? null : text;
+  }
+
+  for (final line in lines) {
+    final word = _titled.firstMatch(line);
+    if (word != null && word[1] == 'title') {
+      title = named(word[2] ?? '');
+      continue;
+    }
+    final axis = _axisLine.firstMatch(line);
+    if (axis != null) {
+      final rest = axis[2]!.trim();
+      final x = axis[1] == 'x';
+      final open = rest.indexOf('[');
+      final range = _xyRange.firstMatch(rest);
+      final low = range == null ? null : _number(range[2]!);
+      final high = range == null ? null : _number(range[3]!);
+      String? name;
+      if (x && open != -1 && rest.endsWith(']')) {
+        final fields = _csvFields(rest.substring(open + 1, rest.length - 1));
+        if (fields == null) continue;
+        categories = [
+          for (final field in fields)
+            if (field.isNotEmpty) field,
+        ];
+        name = named(rest.substring(0, open));
+      } else if (low != null && high != null && low != high) {
+        final ends = (math.min(low, high), math.max(low, high));
+        if (x) {
+          xRange = ends;
+          categories = null;
+        } else {
+          yRange = ends;
+        }
+        name = named(range![1]!);
+      } else {
+        name = named(rest);
+      }
+      if (x) {
+        xTitle = name;
+      } else {
+        yTitle = name;
+      }
+      continue;
+    }
+    final data = _xySeries.firstMatch(line);
+    if (data == null) continue;
+    final values = [for (final value in data[2]!.split(',')) _number(value)];
+    // one unreadable value would shift the rest, so the line is left out
+    if (values.contains(null)) continue;
+    series.add(XySeries(values.nonNulls.toList(), bar: data[1] == 'bar'));
+  }
+  if (series.isEmpty) return null;
+  return XyChart(
+    series,
+    title: title,
+    xTitle: xTitle,
+    yTitle: yTitle,
+    categories: categories == null || categories.isEmpty ? null : categories,
+    xRange: xRange,
+    yRange: yRange,
+  );
 }
 
 extension on String {

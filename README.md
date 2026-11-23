@@ -369,10 +369,16 @@ as its closing fence arrives, with a "Show code" switch under it.
 Flowcharts (`graph` / `flowchart`, with subgraphs), state diagrams
 (`stateDiagram-v2`, with composite states and notes), class diagrams
 (`classDiagram`, with notes and cardinalities), sequence diagrams, ER
-diagrams (`erDiagram`), gantt charts, mindmaps, timelines and pie charts are
-drawn natively, without a WebView. Other kinds (journey, gitGraph,
-quadrant, ...) and lines these readers don't understand stay code blocks; hand those to another renderer with `codeBlockBuilder` if
-you need them:
+diagrams (`erDiagram`), gantt charts, mindmaps, timelines, pie charts, git
+graphs (`gitGraph`), user journeys (`journey`), quadrant charts
+(`quadrantChart`), sankey diagrams (`sankey-beta`) and xy charts
+(`xychart-beta`, bars and lines) are drawn natively, without a WebView.
+Flowcharts, state and class diagrams take the diagram's own colors from
+`classDef`, `class`, `:::`, `style` and `linkStyle` (fill, stroke,
+stroke-width, color, stroke-dasharray); text on a filled node turns black or
+white to stay readable. Other kinds (requirement, C4, block, ...) and lines
+these readers don't understand stay code blocks; hand those to another
+renderer with `codeBlockBuilder` if you need them:
 
 ```dart
 codeBlockBuilder: (context, code, language, isComplete) {
@@ -566,9 +572,14 @@ a normal parse of the full text. Golden images guard the look.
   around plain text, and `<details>`.
 - Inline math in single `$` has to fit on one line; `\( ... \)` may run
   over line ends.
-- Mermaid: the kinds listed under "Diagrams and SVG" only. Styling
-  (`classDef`, `style`) is left out. Gantt charts read `YYYY-MM-DD` dates
-  and day or week durations only.
+- Mermaid: the kinds listed under "Diagrams and SVG" only. Styling reads
+  fill, stroke, stroke-width, color and stroke-dasharray (hex colors and
+  common CSS names) on flowchart, state and class nodes and on flowchart
+  edges; other CSS, `rgb()` colors and styling of subgraphs are left out.
+  Gantt charts read `YYYY-MM-DD` dates and day or week durations only. Git
+  graphs are always drawn left to right, and a cherry-pick is a tagged
+  commit without a line to its source. Xy charts are always vertical. Sankey
+  and xy chart config blocks, and quadrant point styling, are ignored.
 - LaTeX layout comes from the package you give to `mathBuilder`.
 - `markdown` 7.3.1 crashes on a link definition ending in a backslash
   (`[a]: /b\`); this package works around it, and shows the text as it is

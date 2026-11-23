@@ -54,6 +54,89 @@ controller.append('Hello');
 - [ ] docs
 ''';
 
+const _styledDiagrams = '''
+```mermaid
+flowchart LR
+  classDef ok fill:#d4edda,stroke:#28a745,stroke-width:2px
+  classDef bad fill:#8b0000,stroke:#400
+  A[Request] --> B{Valid?}
+  B -->|yes| C[Save]:::ok
+  B -->|no| D[Reject]:::bad
+  C --> E[Done]
+  style E fill:gold,stroke:#333,stroke-dasharray:5 5
+  linkStyle 1 stroke:#28a745,stroke-width:3px
+  linkStyle 2 stroke:#c00,stroke-width:3px
+```
+
+```mermaid
+stateDiagram-v2
+  classDef active fill:#cfe2ff,stroke:#0d6efd
+  [*] --> Idle
+  Idle --> Running
+  Running --> Idle
+  class Running active
+```
+''';
+
+const _newKinds = '''
+```mermaid
+gitGraph
+  commit id: "init"
+  branch feature
+  commit id: "add"
+  commit id: "test"
+  checkout main
+  commit id: "fix" tag: "v1.0"
+  merge feature
+  commit id: "ship" type: HIGHLIGHT
+```
+
+```mermaid
+journey
+  title A reply reaches the screen
+  section Ask
+    Type a question: 5: User
+    Send it: 4: User, App
+  section Answer
+    Wait for the model: 2: User
+    Read the reply: 5: User
+```
+
+```mermaid
+quadrantChart
+  title Packages
+  x-axis Low effort --> High effort
+  y-axis Low value --> High value
+  quadrant-1 Plan
+  quadrant-2 Do first
+  quadrant-3 Skip
+  quadrant-4 Later
+  Benchmarks: [0.25, 0.8]
+  Chat list: [0.7, 0.75]
+  Colors: [0.3, 0.3]
+  Schema: [0.8, 0.35]
+```
+
+```mermaid
+sankey-beta
+Prompt,Model,100
+Model,Text,60
+Model,Tool calls,25
+Model,Thinking,15
+Tool calls,Search,20
+Tool calls,Weather,5
+```
+
+```mermaid
+xychart-beta
+  title Downloads
+  x-axis [Jul, Aug, Sep, Oct, Nov]
+  y-axis "per month" 0 --> 500
+  bar [40, 90, 160, 280, 430]
+  line [30, 100, 150, 300, 420]
+```
+''';
+
 const _diagrams = '''
 ```mermaid
 flowchart TD
@@ -309,6 +392,35 @@ void main() {
       _scene(text: _otherKinds),
       'more_diagram_kinds',
       height: 2900,
+    );
+  });
+
+  testWidgets('diagrams in their own colors', (tester) async {
+    await shoot(
+      tester,
+      _scene(text: _styledDiagrams),
+      'styled_diagrams',
+      height: 430,
+    );
+  });
+
+  testWidgets('git, journey, quadrant, sankey and xy charts', (tester) async {
+    await shoot(
+      tester,
+      _scene(text: _newKinds),
+      'new_diagram_kinds',
+      height: 1400,
+    );
+  });
+
+  testWidgets('git, journey, quadrant, sankey and xy charts, dark', (
+    tester,
+  ) async {
+    await shoot(
+      tester,
+      _scene(text: _newKinds, dark: true),
+      'new_diagram_kinds_dark',
+      height: 1400,
     );
   });
 
