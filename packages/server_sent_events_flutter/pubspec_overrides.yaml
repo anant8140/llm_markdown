@@ -1,0 +1,4 @@
+# Work on the packages of this repository together.
+dependency_overrides:
+  server_sent_events:
+    path: ../server_sent_events

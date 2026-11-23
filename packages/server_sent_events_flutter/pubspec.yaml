@@ -1,0 +1,26 @@
+name: server_sent_events_flutter
+description: >-
+  Flutter widgets for server_sent_events: SseBuilder builds from an event
+  stream and its connection status, and closes the connection when removed.
+version: 0.1.0
+repository: https://github.com/anant8140/llm_markdown/tree/main/packages/server_sent_events_flutter
+issue_tracker: https://github.com/anant8140/llm_markdown/issues
+topics:
+  - sse
+  - eventsource
+  - streaming
+  - widget
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.35.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  server_sent_events: ^0.2.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
