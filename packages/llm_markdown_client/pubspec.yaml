@@ -1,0 +1,28 @@
+name: llm_markdown_client
+description: >-
+  Streams llm_client replies (OpenAI, Anthropic, Gemini, Ollama) into
+  llm_markdown: text, thinking and tool calls, with stop support.
+version: 0.1.0
+repository: https://github.com/anant8140/llm_markdown/tree/main/packages/llm_markdown_client
+issue_tracker: https://github.com/anant8140/llm_markdown/issues
+topics:
+  - markdown
+  - ai
+  - llm
+  - openai
+  - anthropic
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.35.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  llm_client: ^0.1.0
+  llm_markdown: ^0.7.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

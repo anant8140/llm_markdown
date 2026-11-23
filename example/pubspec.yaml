@@ -16,6 +16,8 @@ dependencies:
     path: ../packages/llm_client
   llm_markdown:
     path: ../
+  llm_markdown_client:
+    path: ../packages/llm_markdown_client
   material_ui: ^1.11.1
   server_sent_events:
     path: ../packages/server_sent_events

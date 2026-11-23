@@ -1,0 +1,12 @@
+# Work on the packages of this repository together.
+dependency_overrides:
+  llm_client:
+    path: ../llm_client
+  llm_markdown:
+    path: ../..
+  llm_markdown_parser:
+    path: ../llm_markdown_parser
+  partial_json:
+    path: ../partial_json
+  server_sent_events:
+    path: ../server_sent_events

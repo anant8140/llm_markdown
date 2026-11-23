@@ -4,72 +4,22 @@
 //   server_sent_events  reads the stream of the reply (inside llm_client)
 //   partial_json        reads tool arguments while they are written
 //   llm_markdown        shows the reply
+//   llm_markdown_client joins the two: controller.addLlmEvents(...)
 //
 // Run it: flutter run -t lib/full_stack.dart
 // It answers from a fake server, so it needs no API key; give
 // [FullStackDemo] a real provider to talk to a model.
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:llm_client/llm_client.dart';
 import 'package:llm_markdown/llm_markdown.dart';
+import 'package:llm_markdown_client/llm_markdown_client.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:server_sent_events/server_sent_events.dart';
 import 'package:server_sent_events/testing.dart';
 
 void main() =>
     runApp(MaterialApp(home: FullStackDemo(provider: fakeProvider())));
-
-/// Feeds the events of a reply into [controller]: text, thinking and tool
-/// calls with their arguments as they grow. Stopping the reply
-/// (`controller.complete()`) or starting another (`reset()`) cancels the
-/// request.
-Future<void> showReply(
-  StreamingMarkdownController controller,
-  Stream<LlmEvent> events,
-) {
-  final started = controller.generation;
-  final done = Completer<void>();
-  late final StreamSubscription<LlmEvent> subscription;
-  void stopIfEnded() {
-    if (controller.generation != started || controller.isComplete) {
-      controller.removeListener(stopIfEnded);
-      unawaited(subscription.cancel());
-      if (!done.isCompleted) done.complete();
-    }
-  }
-
-  subscription = events.listen(
-    (event) {
-      switch (event) {
-        case LlmTextDelta(:final text):
-          controller.append(text);
-        case LlmThinkingDelta(:final text):
-          controller.appendThinking(text);
-        case LlmToolCallStart(:final id, :final name):
-          controller.startToolCall(id, name);
-        case LlmToolCallDelta(:final id, :final rawDelta):
-          controller.addToolCallArguments(id, rawDelta);
-        case LlmToolCallDone(:final id):
-          controller.finishToolCall(id);
-        case LlmUsage() || LlmDone():
-          break;
-      }
-    },
-    onError: (Object error, StackTrace stackTrace) {
-      controller.removeListener(stopIfEnded);
-      controller.completeWithError(error, stackTrace);
-      if (!done.isCompleted) done.complete();
-    },
-    onDone: () {
-      controller.removeListener(stopIfEnded);
-      controller.complete();
-      if (!done.isCompleted) done.complete();
-    },
-  );
-  controller.addListener(stopIfEnded);
-  return done.future;
-}
 
 /// A chat with one question box; the reply streams into `llm_markdown`.
 class FullStackDemo extends StatefulWidget {
@@ -92,27 +42,30 @@ class _FullStackDemoState extends State<FullStackDemo> {
   Future<void> _ask() async {
     _controller.reset();
     setState(() => _busy = true);
-    await showReply(
-      _controller,
-      widget.provider.stream(
-        LlmRequest(
-          model: widget.model,
-          messages: [LlmMessage.user(_question.text)],
-          tools: const [
-            LlmTool(
-              name: 'get_weather',
-              description: 'The weather in a city',
-              parameters: {
-                'type': 'object',
-                'properties': {
-                  'city': {'type': 'string'},
+    try {
+      await _controller.addLlmEvents(
+        widget.provider.stream(
+          LlmRequest(
+            model: widget.model,
+            messages: [LlmMessage.user(_question.text)],
+            tools: const [
+              LlmTool(
+                name: 'get_weather',
+                description: 'The weather in a city',
+                parameters: {
+                  'type': 'object',
+                  'properties': {
+                    'city': {'type': 'string'},
+                  },
                 },
-              },
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    } catch (_) {
+      // the error is shown in the reply
+    }
     if (mounted) setState(() => _busy = false);
   }
 
