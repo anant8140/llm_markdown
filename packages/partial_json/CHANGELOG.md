@@ -15,6 +15,8 @@
 * `ToolArgumentsParser`: the arguments of streamed tool calls, per call.
 * `partialStrings` and `partialNumbers`: show only finished values.
 * `bigInts`: large whole numbers stay exact, on the web too.
+* `checkPartialJson` and `checkJsonSchema`: a value against a JSON Schema,
+  while it is written or whole.
 * Errors name the line and column.
 
 ## 0.1.0

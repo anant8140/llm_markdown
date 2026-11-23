@@ -7,6 +7,8 @@
 library;
 
 export 'src/parser.dart' show PartialJsonParser, parsePartialJson, repairJson;
+export 'src/schema.dart'
+    show JsonSchemaIssue, checkJsonSchema, checkPartialJson;
 export 'src/streams.dart'
     show
         PartialJsonDecoder,

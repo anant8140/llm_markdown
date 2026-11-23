@@ -118,6 +118,23 @@ args.add(call.id, delta); // the arguments so far, per call
 args.close(call.id);      // the finished arguments
 ```
 
+### Checking against a JSON Schema
+
+```dart
+final issues = checkPartialJson(parser, schema);
+// [] while everything written so far can still fit the schema
+```
+
+While the value is written, only what can't change any more is reported: a
+wrong type, an unknown property, a finished value that breaks a rule. A
+missing required property or a too short list is reported once its object
+is finished. So an issue during streaming is a real one, and the reply can
+be stopped early. `checkJsonSchema(value, schema)` checks a whole value.
+
+It reads `type`, `properties`, `required`, `additionalProperties`, `items`,
+`enum`, `const`, the number, string and list limits, `anyOf`, `oneOf`,
+`allOf` and `nullable`; `$ref` and `pattern` are ignored.
+
 ### Settings
 
 | | default | |
