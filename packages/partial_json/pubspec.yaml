@@ -1,0 +1,21 @@
+name: partial_json
+description: >-
+  Parse JSON while it streams in: a truncated JSON document gives the
+  objects, lists and strings so far. For structured output and tool calls
+  of AI models.
+version: 0.1.0
+repository: https://github.com/anant8140/llm_markdown/tree/main/packages/partial_json
+issue_tracker: https://github.com/anant8140/llm_markdown/issues
+topics:
+  - json
+  - parser
+  - streaming
+  - ai
+  - llm
+
+environment:
+  sdk: ^3.9.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.0
