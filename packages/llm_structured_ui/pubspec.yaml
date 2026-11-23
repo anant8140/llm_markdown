@@ -5,6 +5,11 @@ description: >-
 version: 0.1.0
 repository: https://github.com/anant8140/llm_markdown/tree/main/packages/llm_structured_ui
 issue_tracker: https://github.com/anant8140/llm_markdown/issues
+screenshots:
+  - description: A recipe object while the model is still writing its second step
+    path: doc/streaming.png
+  - description: The same object once it is complete
+    path: doc/done.png
 topics:
   - ai
   - llm

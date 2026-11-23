@@ -3,6 +3,8 @@
 Flutter widgets that show an AI model's structured (JSON) output while it
 is still being written, instead of waiting for the whole object.
 
+![A recipe object while its second step is still being written](https://raw.githubusercontent.com/anant8140/llm_markdown/main/packages/llm_structured_ui/doc/streaming.png)
+
 A model asked for JSON sends it a few characters at a time. This package
 reads the document as it grows (with
 [partial_json](https://pub.dev/packages/partial_json)) and gives you:
