@@ -4,3 +4,5 @@
 dependency_overrides:
   llm_markdown_parser:
     path: packages/llm_markdown_parser
+  partial_json:
+    path: packages/partial_json

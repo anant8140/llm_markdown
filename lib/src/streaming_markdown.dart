@@ -88,6 +88,7 @@ class StreamingMarkdown extends StatefulWidget {
     this.labels,
     this.thinkingBuilder,
     this.showToolCalls = true,
+    this.showToolCallArguments = true,
     this.toolCallBuilder,
     this.cursorBuilder,
     this.autoScrollController,
@@ -147,6 +148,7 @@ class StreamingMarkdown extends StatefulWidget {
     this.labels,
     this.thinkingBuilder,
     this.showToolCalls = true,
+    this.showToolCallArguments = true,
     this.toolCallBuilder,
     this.cursorBuilder,
     this.autoScrollController,
@@ -206,6 +208,7 @@ class StreamingMarkdown extends StatefulWidget {
     this.labels,
     this.thinkingBuilder,
     this.showToolCalls = true,
+    this.showToolCallArguments = true,
     this.toolCallBuilder,
     this.cursorBuilder,
     this.autoScrollController,
@@ -415,6 +418,11 @@ class StreamingMarkdown extends StatefulWidget {
   /// Whether the tools the model calls ([StreamingMarkdownController.toolCalls])
   /// are listed at the top of the reply, one line each.
   final bool showToolCalls;
+
+  /// Whether a tool call's line also says what the call is about: the
+  /// first text among its arguments, such as the query of a search, shown
+  /// as it is written. See [MarkdownToolCall.summary].
+  final bool showToolCallArguments;
 
   /// Builds the line for one tool call yourself, in place of the built-in
   /// "Using web search…" line.
@@ -1034,6 +1042,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
               : ToolCallLine(
                   key: ValueKey('tool ${call.id}'),
                   label: label(call.name, call.isDone),
+                  detail: widget.showToolCallArguments ? call.summary : null,
                   done: call.isDone,
                   color: style.accentColor,
                   textStyle: style.textStyle,

@@ -18,12 +18,16 @@ class ToolCallLine extends StatelessWidget {
   const ToolCallLine({
     super.key,
     required this.label,
+    this.detail,
     required this.done,
     required this.color,
     required this.textStyle,
   });
 
   final String label;
+
+  /// What the call is about, shown after the label in one line.
+  final String? detail;
   final bool done;
   final Color color;
   final TextStyle textStyle;
@@ -34,7 +38,7 @@ class ToolCallLine extends StatelessWidget {
     return Semantics(
       // stays a live region, so the change to done is read out too
       liveRegion: true,
-      label: label,
+      label: detail == null ? label : '$label $detail',
       excludeSemantics: true,
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -49,8 +53,21 @@ class ToolCallLine extends StatelessWidget {
             ),
           SizedBox(width: size * 0.4),
           Flexible(
-            child: Text(
-              label,
+            child: Text.rich(
+              TextSpan(
+                text: label,
+                children: [
+                  if (detail != null)
+                    TextSpan(
+                      text: '  $detail',
+                      style: TextStyle(
+                        color: textStyle.color?.withValues(alpha: 0.5),
+                      ),
+                    ),
+                ],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: textStyle.copyWith(
                 color: textStyle.color?.withValues(alpha: 0.7),
               ),

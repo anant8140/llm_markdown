@@ -1,3 +1,4 @@
+import 'package:partial_json/partial_json.dart';
 import 'dart:async';
 import 'dart:collection';
 
@@ -367,6 +368,35 @@ class MarkdownToolCall {
 
   /// Whether the call has finished.
   final bool isDone;
+
+  /// The [arguments] read as far as they are written: a map such as
+  /// `{query: Paris wea}` while the model is still writing them. Null when
+  /// there are none yet or they are not JSON.
+  Object? get argumentsSoFar {
+    if (arguments.trim().isEmpty) return null;
+    try {
+      return parsePartialJson(arguments, lenient: false);
+    } on FormatException {
+      return null;
+    }
+  }
+
+  /// A short text saying what the call is about: the first text among its
+  /// arguments, such as the query of a search. Null when there is none.
+  String? get summary {
+    final value = argumentsSoFar;
+    final values = switch (value) {
+      Map() => value.values,
+      List() => value,
+      _ => const <Object?>[],
+    };
+    for (final item in values) {
+      if (item is String && item.trim().isNotEmpty) {
+        return item.trim().replaceAll(RegExp(r'\s+'), ' ');
+      }
+    }
+    return null;
+  }
 
   MarkdownToolCall _copy({String? name, String? arguments, bool? isDone}) =>
       MarkdownToolCall(

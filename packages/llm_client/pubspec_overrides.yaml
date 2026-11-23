@@ -1,0 +1,7 @@
+# Work on the packages of this repository together. Not published (see
+# .pubignore): on pub.dev the released packages are used.
+dependency_overrides:
+  server_sent_events:
+    path: ../server_sent_events
+  partial_json:
+    path: ../partial_json

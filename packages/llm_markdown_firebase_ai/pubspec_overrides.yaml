@@ -5,3 +5,5 @@ dependency_overrides:
     path: ../..
   llm_markdown_parser:
     path: ../llm_markdown_parser
+  partial_json:
+    path: ../partial_json
