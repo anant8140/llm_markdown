@@ -1,3 +1,15 @@
+## 0.6.0
+
+* `StreamingMarkdown.text` takes `completeAfter`: for a text that grows but
+  never says when it is done, such as the `responseBuilder` of
+  `flutter_ai_toolkit`'s `LlmChatView`, the reply counts as complete once it
+  has not grown for that long. Text there at the first build counts as
+  complete, so replies from the history show no cursor.
+* New companion package
+  [llm_markdown_firebase_ai](https://pub.dev/packages/llm_markdown_firebase_ai):
+  `addFirebaseAIStream` reads Firebase AI Logic (`firebase_ai`) replies,
+  with thinking, function calls and Google Search sources.
+
 ## 0.5.0
 
 * `addGeminiStream` reads a Gemini `streamGenerateContent?alt=sse` response;

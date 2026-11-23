@@ -27,6 +27,13 @@ jobs:
           dart pub get
           dart analyze
           dart test
+      - name: Firebase AI package
+        working-directory: packages/llm_markdown_firebase_ai
+        run: |
+          flutter pub get
+          dart format --output=none --set-exit-if-changed .
+          flutter analyze
+          flutter test
       - name: Example
         working-directory: example
         run: |

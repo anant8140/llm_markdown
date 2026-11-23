@@ -95,7 +95,8 @@ class StreamingMarkdown extends StatefulWidget {
        assert(!sliver || maxLines == null, 'a sliver has no maxLines'),
        stream = null,
        text = null,
-       isComplete = false;
+       isComplete = false,
+       completeAfter = null;
 
   /// Shows the chunks of [stream] as they arrive. The reply is complete when
   /// [stream] is done.
@@ -153,7 +154,8 @@ class StreamingMarkdown extends StatefulWidget {
        assert(!sliver || maxLines == null, 'a sliver has no maxLines'),
        controller = null,
        text = null,
-       isComplete = false;
+       isComplete = false,
+       completeAfter = null;
 
   /// Shows [text].
   ///
@@ -207,6 +209,7 @@ class StreamingMarkdown extends StatefulWidget {
     this.toolCallBuilder,
     this.cursorBuilder,
     this.autoScrollController,
+    this.completeAfter,
   }) : assert(maxLines == null || maxLines > 0, 'maxLines must be positive'),
        assert(!sliver || maxLines == null, 'a sliver has no maxLines'),
        controller = null,
@@ -224,7 +227,19 @@ class StreamingMarkdown extends StatefulWidget {
   final String? text;
 
   /// Whether [text] is the whole reply. Used with [StreamingMarkdown.text].
+  ///
+  /// Ignored when [completeAfter] is set.
   final bool isComplete;
+
+  /// For a [text] that grows but never says when it is done, such as the
+  /// `responseBuilder` of `LlmChatView` in `flutter_ai_toolkit`: the reply
+  /// counts as complete once [text] has not grown for this long.
+  ///
+  /// The text given when the widget first builds counts as complete, so a
+  /// reply from the history shows no cursor; when it grows, the new part is
+  /// streamed. Used with [StreamingMarkdown.text]; [isComplete] is then
+  /// ignored.
+  final Duration? completeAfter;
 
   /// How fast arriving text is revealed. Text that is already there when
   /// the widget first builds is shown at once.
@@ -472,7 +487,9 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     } else {
       _controller = _ownedController = StreamingMarkdownController(
         text: widget.text ?? '',
-        isComplete: widget.text != null && widget.isComplete,
+        isComplete:
+            widget.text != null &&
+            (widget.completeAfter != null || widget.isComplete),
       );
       final stream = widget.stream;
       if (stream != null) {
@@ -528,6 +545,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     _controller.removeListener(_onControllerChanged);
     unawaited(_subscription?.cancel());
     _subscription = null;
+    _idleTimer?.cancel();
     _ownedController?.dispose();
     _ownedController = null;
   }
@@ -611,12 +629,40 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     final text = widget.text;
     final owned = _ownedController;
     if (text == null || owned == null) return;
+    final idle = widget.completeAfter;
+    if (idle != null) {
+      _updateGrowing(owned, text, idle);
+      return;
+    }
+    _idleTimer?.cancel();
     if (text == owned.text && widget.isComplete == owned.isComplete) return;
     if (!owned.isComplete && text.startsWith(owned.text)) {
       owned.append(text.substring(owned.text.length));
       if (widget.isComplete) owned.complete();
     } else {
       owned.reset(text, widget.isComplete);
+    }
+  }
+
+  Timer? _idleTimer;
+
+  /// Follows a [StreamingMarkdown.text] whose end is guessed from
+  /// [StreamingMarkdown.completeAfter].
+  void _updateGrowing(
+    StreamingMarkdownController owned,
+    String text,
+    Duration idle,
+  ) {
+    if (text == owned.text) return;
+    if (text.startsWith(owned.text)) {
+      // Reopen a reply counted as complete, keeping what is shown.
+      if (owned.isComplete) owned.reset(owned.text);
+      owned.append(text.substring(owned.text.length));
+      _idleTimer?.cancel();
+      _idleTimer = Timer(idle, owned.complete);
+    } else {
+      _idleTimer?.cancel();
+      owned.reset(text, true);
     }
   }
 
@@ -698,6 +744,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
   @override
   void dispose() {
     _throttle?.cancel();
+    _idleTimer?.cancel();
     _ticker.dispose();
     _detach();
     widget.headings?.detach(_settings.anchors);

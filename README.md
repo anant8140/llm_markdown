@@ -201,6 +201,31 @@ await controller.addOllamaStream(response.stream); // /api/chat or /api/generate
 providers, such as Ollama's `/v1/chat/completions`, OpenRouter, Groq and
 DeepSeek.
 
+### Firebase AI and the Flutter AI Toolkit
+
+With Firebase AI Logic (`firebase_ai`), add
+[llm_markdown_firebase_ai](https://pub.dev/packages/llm_markdown_firebase_ai)
+and hand it the response stream:
+
+```dart
+final model = FirebaseAI.googleAI().generativeModel(model: 'gemini-2.5-flash');
+controller.addFirebaseAIStream(model.generateContentStream([Content.text(prompt)]));
+```
+
+In `LlmChatView` from `flutter_ai_toolkit`, show the replies with
+`llm_markdown` through `responseBuilder`. The toolkit gives only the text so
+far, so `completeAfter` counts a reply as done once it stops growing:
+
+```dart
+LlmChatView(
+  provider: provider,
+  responseBuilder: (context, response) => StreamingMarkdown.text(
+    response,
+    completeAfter: const Duration(seconds: 1),
+  ),
+)
+```
+
 ### Tool calls and sources
 
 When the model calls a tool (a web search, one of your functions), the
