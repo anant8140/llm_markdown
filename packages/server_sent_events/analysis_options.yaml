@@ -1,1 +1,6 @@
 include: package:lints/recommended.yaml
+
+analyzer:
+  exclude:
+    # its own Flutter package, with its own dependencies; see its README
+    - benchmark/**
