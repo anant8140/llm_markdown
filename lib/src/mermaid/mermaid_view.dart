@@ -1311,8 +1311,8 @@ class _SceneBuilder {
       if (!boxed) return;
       // the erased bit of any group box under it is painted back
       final under = [
-        for (final g in drawOrder)
-          if (boxes[g] case final box? when box.outerRect.overlaps(gap)) box,
+        for (final box in drawOrder.map((g) => boxes[g]).nonNulls)
+          if (box.outerRect.overlaps(gap)) box,
       ];
       if (under.isEmpty) return;
       ops.add((canvas) {
