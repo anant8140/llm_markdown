@@ -172,4 +172,43 @@ void main() {
       await old.close();
     },
   );
+
+  test('every blocking finish reason ends with an error', () async {
+    for (final reason in [
+      FinishReason.blocklist,
+      FinishReason.prohibitedContent,
+      FinishReason.spii,
+      FinishReason.malformedFunctionCall,
+    ]) {
+      final controller = StreamingMarkdownController();
+      final done = controller.addFirebaseAIStream(
+        Stream.value(_reply(const [], finish: reason)),
+      );
+      await expectLater(done, throwsA(isA<ModelStreamError>()));
+      expect('${controller.error}', contains('Blocked: ${reason.name}'));
+      controller.dispose();
+    }
+    // a normal end is not an error
+    final controller = StreamingMarkdownController();
+    addTearDown(controller.dispose);
+    await controller.addFirebaseAIStream(
+      Stream.value(
+        _reply([const TextPart('ok')], finish: FinishReason.maxTokens),
+      ),
+    );
+    expect(controller.error, isNull);
+  });
+
+  test('a reply stopped before the first response cancels quietly', () async {
+    var cancelled = false;
+    final source = StreamController<GenerateContentResponse>(
+      onCancel: () => cancelled = true,
+    );
+    final controller = StreamingMarkdownController()..complete();
+    addTearDown(controller.dispose);
+    await controller.addFirebaseAIStream(source.stream);
+    expect(cancelled, isTrue);
+    expect(controller.error, isNull);
+    await source.close();
+  });
 }

@@ -3,6 +3,11 @@
 * `addStream` stops at once when the reply is completed (a stop button) or
   reset, and cancels the stream, which closes the request behind it; it
   used to wait for the next chunk and to keep reading after `complete`.
+* `addStream` and the model adapters on a reply that is already complete
+  (stopped while its request was being sent) now cancel the response and
+  return; they used to throw on the first chunk and never end.
+* `completeAfter`: a reply that grows again after a pause continues where
+  it was, instead of being rebuilt from the start.
 * New companion package
   [llm_markdown_chat](https://pub.dev/packages/llm_markdown_chat): a ready
   chat screen with message list, input, send and stop, copy and try again.

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:llm_markdown/llm_markdown.dart';
 
 /// Who wrote a [ChatMessage].
@@ -62,7 +63,9 @@ class ChatMessage {
 /// Writes the reply to [prompt] into [reply], for example with
 /// `reply.addOpenAIStream(response.stream)`.
 ///
-/// [history] is the chat before [prompt], oldest first. When the returned
+/// [history] is the chat before [prompt], oldest first, without the turns
+/// whose reply failed or was stopped before it wrote anything, so it can be
+/// sent to a model as it is. When the returned
 /// future ends, a reply that is not complete yet is completed; an error
 /// ends it with [StreamingMarkdownController.completeWithError].
 typedef ChatReplier =
@@ -93,7 +96,7 @@ class LlmChatController extends ChangeNotifier {
   final ChatReplier onReply;
 
   final List<ChatMessage> _messages;
-  // messages taken out of the list are disposed with the controller, as a
+  // messages taken out of the list, until their replies are disposed: a
   // view may still show them until its next frame
   final List<ChatMessage> _removed = [];
   ChatMessage? _replying;
@@ -118,8 +121,8 @@ class LlmChatController extends ChangeNotifier {
   /// The future ends with the reply.
   Future<void> send(String prompt) async {
     final text = prompt.trim();
-    if (text.isEmpty || isReplying) return;
-    final history = List<ChatMessage>.unmodifiable(_messages);
+    if (_disposed || text.isEmpty || isReplying) return;
+    final history = List<ChatMessage>.unmodifiable(_history());
     final message = ChatMessage._streaming();
     final reply = message.reply!;
     _messages
@@ -142,11 +145,30 @@ class LlmChatController extends ChangeNotifier {
     }
   }
 
+  // The messages to give a model: a reply that ended with an error or
+  // wrote nothing is left out with its prompt, as most APIs refuse empty
+  // messages and want the roles to take turns.
+  List<ChatMessage> _history() {
+    final kept = <ChatMessage>[];
+    for (final message in _messages) {
+      final failed =
+          message.role == ChatRole.assistant &&
+          (message.hasError || message.text.trim().isEmpty);
+      if (!failed) {
+        kept.add(message);
+      } else if (kept.isNotEmpty && kept.last.role == ChatRole.user) {
+        kept.removeLast();
+      }
+    }
+    return kept;
+  }
+
   bool _live(ChatMessage message) => !_disposed && !_removed.contains(message);
 
   /// Ends the reply being written, keeping what it wrote so far. The
   /// adapters of `llm_markdown` stop reading, which closes the request.
   void stop() {
+    if (_disposed) return;
     final message = _replying;
     if (message == null) return;
     _replying = null;
@@ -160,18 +182,43 @@ class LlmChatController extends ChangeNotifier {
     if (!canRetry) return Future.value();
     final reply = _messages.removeLast();
     final prompt = _messages.removeLast();
-    _removed.addAll([reply, prompt]);
+    _retire([reply, prompt]);
     return send(prompt.text);
   }
 
   /// Removes every message, stopping a reply being written.
   void clear() {
+    if (_disposed) return;
     final message = _replying;
     _replying = null;
     message?.reply!.complete();
-    _removed.addAll(_messages);
+    _retire(_messages);
     _messages.clear();
     notifyListeners();
+  }
+
+  // Disposes the replies of removed messages once the view has drawn a
+  // frame without them; without a running app, when this is disposed.
+  void _retire(Iterable<ChatMessage> messages) {
+    final removed = [
+      for (final message in messages)
+        if (message.reply != null) message,
+    ];
+    if (removed.isEmpty) return;
+    _removed.addAll(removed);
+    final SchedulerBinding binding;
+    try {
+      binding = SchedulerBinding.instance;
+    } on Object {
+      return;
+    }
+    binding.addPostFrameCallback((_) {
+      if (_disposed) return;
+      for (final message in removed) {
+        if (_removed.remove(message)) message.reply!.dispose();
+      }
+    });
+    binding.ensureVisualUpdate();
   }
 
   bool _disposed = false;

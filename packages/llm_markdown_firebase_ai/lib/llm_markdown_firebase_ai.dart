@@ -28,6 +28,11 @@ extension FirebaseAIStreams on StreamingMarkdownController {
   /// rethrown. Calling [reset] or [complete] meanwhile (a stop button) stops
   /// reading at once and cancels [responses], which closes the request.
   Future<void> addFirebaseAIStream(Stream<GenerateContentResponse> responses) {
+    // already stopped, for example while waiting for the first response
+    if (isComplete) {
+      unawaited(responses.listen(null).cancel());
+      return Future.value();
+    }
     final started = generation;
     final done = Completer<void>();
     var calls = 0;
@@ -98,8 +103,8 @@ extension FirebaseAIStreams on StreamingMarkdownController {
         }
       }
       final reason = candidate.finishReason;
-      if (reason == FinishReason.safety || reason == FinishReason.recitation) {
-        throw ModelStreamError(_blocked(reason!.name, candidate.finishMessage));
+      if (reason != null && _blockedReasons.contains(reason.name)) {
+        throw ModelStreamError(_blocked(reason.name, candidate.finishMessage));
       }
     }
 
@@ -123,6 +128,23 @@ extension FirebaseAIStreams on StreamingMarkdownController {
     );
     return done.future;
   }
+
+  // by name, as newer firebase_ai versions add reasons
+  static const _blockedReasons = {
+    'safety',
+    'recitation',
+    'blocklist',
+    'prohibitedContent',
+    'spii',
+    'malformedFunctionCall',
+    'imageSafety',
+    'imageProhibitedContent',
+    'imageRecitation',
+    'language',
+    'unexpectedToolCall',
+    'tooManyToolCalls',
+    'malformedResponse',
+  };
 
   static String _blocked(String reason, String? message) =>
       'Blocked: $reason'

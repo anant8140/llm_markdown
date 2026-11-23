@@ -400,47 +400,58 @@ class _LlmChatViewState extends State<LlmChatView> {
                 child: Focus(
                   // Enter sends, Shift+Enter starts a new line
                   onKeyEvent: (node, event) {
-                    if (event is KeyDownEvent &&
-                        (event.logicalKey == LogicalKeyboardKey.enter ||
-                            event.logicalKey ==
-                                LogicalKeyboardKey.numpadEnter) &&
-                        !HardwareKeyboard.instance.isShiftPressed) {
-                      _send();
-                      return KeyEventResult.handled;
+                    final enter =
+                        event.logicalKey == LogicalKeyboardKey.enter ||
+                        event.logicalKey == LogicalKeyboardKey.numpadEnter;
+                    if (!enter || event is KeyUpEvent) {
+                      return KeyEventResult.ignored;
                     }
-                    return KeyEventResult.ignored;
+                    // Enter that picks a candidate of an input method
+                    // (Chinese, Japanese, ...) is the input method's
+                    final composing = _input.value.composing;
+                    if (composing.isValid && !composing.isCollapsed) {
+                      return KeyEventResult.ignored;
+                    }
+                    if (HardwareKeyboard.instance.isShiftPressed) {
+                      return KeyEventResult.ignored;
+                    }
+                    // a held Enter sends once and adds no new lines
+                    if (event is KeyDownEvent) _send();
+                    return KeyEventResult.handled;
                   },
-                  child: Semantics(
-                    container: true,
-                    label: widget.labels.hint,
-                    child: Stack(
-                      children: [
-                        if (_input.text.isEmpty)
-                          ExcludeSemantics(
-                            child: IgnorePointer(
-                              child: Text(
-                                widget.labels.hint,
-                                style: hint,
-                                maxLines: 1,
+                  // one node: the text field, named by the hint
+                  child: MergeSemantics(
+                    child: Semantics(
+                      label: widget.labels.hint,
+                      child: Stack(
+                        children: [
+                          if (_input.text.isEmpty)
+                            ExcludeSemantics(
+                              child: IgnorePointer(
+                                child: Text(
+                                  widget.labels.hint,
+                                  style: hint,
+                                  maxLines: 1,
+                                ),
                               ),
                             ),
+                          EditableText(
+                            controller: _input,
+                            focusNode: _focus,
+                            autofocus: widget.autofocus,
+                            style: style.textStyle,
+                            cursorColor: style.accentColor,
+                            backgroundCursorColor: style.borderColor,
+                            selectionColor: style.accentColor.withValues(
+                              alpha: 0.3,
+                            ),
+                            minLines: 1,
+                            maxLines: widget.maxInputLines,
+                            keyboardType: TextInputType.multiline,
+                            textInputAction: TextInputAction.newline,
                           ),
-                        EditableText(
-                          controller: _input,
-                          focusNode: _focus,
-                          autofocus: widget.autofocus,
-                          style: style.textStyle,
-                          cursorColor: style.accentColor,
-                          backgroundCursorColor: style.borderColor,
-                          selectionColor: style.accentColor.withValues(
-                            alpha: 0.3,
-                          ),
-                          minLines: 1,
-                          maxLines: widget.maxInputLines,
-                          keyboardType: TextInputType.multiline,
-                          textInputAction: TextInputAction.newline,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

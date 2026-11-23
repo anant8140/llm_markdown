@@ -384,6 +384,12 @@ extension ModelStreams on StreamingMarkdownController {
     Stream<T> Function(Stream<List<int>> bytes) decode,
     bool Function(T event) onEvent,
   ) {
+    // already stopped, for example while the request was being sent: close
+    // the response without reading it
+    if (isComplete) {
+      unawaited(bytes.listen(null).cancel());
+      return Future.value();
+    }
     final started = generation;
     final done = Completer<void>();
     // The body is read here and handed on, so that stopping can cancel it

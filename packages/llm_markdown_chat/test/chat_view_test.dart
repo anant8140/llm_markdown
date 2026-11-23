@@ -207,4 +207,84 @@ void main() {
     expect(answer.bottom, lessThan(input.top));
     expect(input.top - answer.bottom, lessThan(120));
   });
+
+  testWidgets('Enter that picks an input method candidate does not send', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(LlmChatView(controller: chat, autofocus: true)),
+    );
+    await tester.pump();
+    await tester.showKeyboard(find.byType(EditableText));
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: 'ni',
+        selection: TextSelection.collapsed(offset: 2),
+        composing: TextRange(start: 0, end: 2),
+      ),
+    );
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(prompts, isEmpty);
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '你',
+        selection: TextSelection.collapsed(offset: 1),
+      ),
+    );
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(prompts, ['你']);
+  });
+
+  testWidgets('a held Enter sends once and adds no new lines', (tester) async {
+    await tester.pumpWidget(
+      _app(LlmChatView(controller: chat, autofocus: true)),
+    );
+    await tester.pump();
+    await tester.enterText(find.byType(EditableText), 'Once');
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.enter);
+    for (var i = 0; i < 3; i++) {
+      await tester.sendKeyRepeatEvent(LogicalKeyboardKey.enter);
+    }
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(prompts, ['Once']);
+    final field = tester.widget<EditableText>(find.byType(EditableText));
+    expect(field.controller.text, isEmpty);
+  });
+
+  testWidgets('the input is one text field named by the hint', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(_app(LlmChatView(controller: chat)));
+    final node = tester.getSemantics(find.byType(EditableText));
+    expect(node.label, 'Message');
+    expect(node.flagsCollection.isTextField, isTrue);
+    expect(_button('Send'), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('replies taken out by retry are disposed after a frame', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(_app(LlmChatView(controller: chat)));
+    await tester.enterText(find.byType(EditableText), 'Q');
+    await tester.pump();
+    await tester.tap(_button('Send'));
+    await tester.pump();
+    await source.close();
+    await _settle(tester);
+    final old = chat.messages.last.reply!;
+    source = StreamController<String>();
+    await tester.tap(_button('Try again'));
+    await tester.pump();
+    await tester.pump();
+    expect(() => old.addListener(() {}), throwsFlutterError);
+    await source.close();
+    await _settle(tester);
+    semantics.dispose();
+  });
 }

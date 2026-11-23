@@ -166,4 +166,81 @@ void main() {
     expect(a.id, isNot(b.id));
     expect(ChatMessage.user('x', id: 'mine').id, 'mine');
   });
+
+  test('history leaves out failed and empty turns', () async {
+    final seen = <List<String>>[];
+    var attempt = 0;
+    final source = StreamController<String>();
+    final chat = LlmChatController(
+      history: [ChatMessage.user('Old'), ChatMessage.assistant('Fine')],
+      onReply: (prompt, reply, history) async {
+        seen.add([for (final m in history) '${m.role.name}:${m.text}']);
+        attempt++;
+        if (attempt == 1) throw StateError('down');
+        if (attempt == 2) return reply.addStream(source.stream);
+        reply.append('ok');
+      },
+    );
+    addTearDown(chat.dispose);
+    await chat.send('Fails');
+    final stopped = chat.send('Stopped');
+    await Future<void>.delayed(Duration.zero);
+    chat.stop();
+    await stopped;
+    await chat.send('Last');
+    expect(seen.last, ['user:Old', 'assistant:Fine']);
+    // all six messages are still shown
+    expect(chat.messages.length, 8);
+    await source.close();
+  });
+
+  test('a stopped reply with text stays in the history', () async {
+    final seen = <List<String>>[];
+    final source = StreamController<String>();
+    final chat = LlmChatController(
+      onReply: (prompt, reply, history) async {
+        seen.add([for (final m in history) m.text]);
+        if (prompt == 'A') return reply.addStream(source.stream);
+      },
+    );
+    addTearDown(chat.dispose);
+    final first = chat.send('A');
+    source.add('Partial');
+    await Future<void>.delayed(Duration.zero);
+    chat.stop();
+    await first;
+    await chat.send('B');
+    expect(seen.last, ['A', 'Partial']);
+    await source.close();
+  });
+
+  test('stopping while the request is sent ends quietly', () async {
+    final sent = Completer<void>();
+    var cancelled = false;
+    final chat = LlmChatController(
+      onReply: (prompt, reply, history) async {
+        await sent.future;
+        final body = StreamController<List<int>>(
+          onCancel: () => cancelled = true,
+        );
+        await reply.addOpenAIStream(body.stream);
+      },
+    );
+    addTearDown(chat.dispose);
+    final sending = chat.send('Q');
+    chat.stop();
+    sent.complete();
+    await sending;
+    expect(cancelled, isTrue);
+    expect(chat.messages.last.hasError, isFalse);
+  });
+
+  test('send, stop and clear after dispose do nothing', () async {
+    final chat = LlmChatController(onReply: (p, r, h) async {});
+    chat.dispose();
+    await chat.send('Q');
+    chat.stop();
+    chat.clear();
+    expect(chat.messages, isEmpty);
+  });
 }

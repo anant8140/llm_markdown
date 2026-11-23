@@ -1,3 +1,11 @@
+## 0.1.1
+
+* A reply stopped before the first response arrives cancels the request
+  quietly instead of ending with an error.
+* Every blocking finish reason (blocklist, prohibited content, personal
+  data, malformed function call and others) ends the reply with an error;
+  only safety and recitation did.
+
 ## 0.1.0
 
 * `addFirebaseAIStream` reads `firebase_ai` replies into a

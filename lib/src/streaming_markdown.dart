@@ -656,7 +656,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     if (text == owned.text) return;
     if (text.startsWith(owned.text)) {
       // Reopen a reply counted as complete, keeping what is shown.
-      if (owned.isComplete) owned.reset(owned.text);
+      owned.reopen();
       owned.append(text.substring(owned.text.length));
       _idleTimer?.cancel();
       _idleTimer = Timer(idle, owned.complete);

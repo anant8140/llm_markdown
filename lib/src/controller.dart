@@ -224,6 +224,17 @@ class StreamingMarkdownController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Lets a completed reply grow again, keeping what is shown; used by
+  /// `StreamingMarkdown.text` with `completeAfter`.
+  @internal
+  void reopen() {
+    if (!_isComplete) return;
+    _isComplete = false;
+    _error = null;
+    _stackTrace = null;
+    notifyListeners();
+  }
+
   /// Replaces the text with [text], for example to start a new reply.
   ///
   /// A replaced text is shown at once, without smoothing.
@@ -241,11 +252,20 @@ class StreamingMarkdownController extends ChangeNotifier {
 
   /// Appends every chunk of [stream] and completes when it is done.
   ///
+  /// On a reply that is already complete, for example one stopped while
+  /// its request was being sent, [stream] is cancelled and nothing is
+  /// added.
+  ///
   /// Stops at once, without completing, if [reset] is called meanwhile, and
   /// also if [complete] is (a stop button): [stream] is then cancelled,
   /// which closes the request behind it. An error in [stream] ends the
   /// reply with [completeWithError] and is then rethrown.
   Future<void> addStream(Stream<String> stream) {
+    // already stopped, for example while the request was being sent
+    if (_isComplete) {
+      unawaited(stream.listen(null).cancel());
+      return Future.value();
+    }
     final started = _generation;
     final done = Completer<void>();
     late final StreamSubscription<String> subscription;
