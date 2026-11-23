@@ -12,9 +12,13 @@ dependencies:
     sdk: flutter
   flutter_markdown_plus: ^1.0.12
   flutter_math_fork: ^0.7.4
+  llm_client:
+    path: ../packages/llm_client
   llm_markdown:
     path: ../
   material_ui: ^1.11.1
+  server_sent_events:
+    path: ../packages/server_sent_events
 
 dev_dependencies:
   flutter_lints: ^6.0.0
@@ -27,6 +31,8 @@ dependency_overrides:
     path: ../packages/llm_markdown_parser
   partial_json:
     path: ../packages/partial_json
+  server_sent_events:
+    path: ../packages/server_sent_events
 
 flutter:
   uses-material-design: true
