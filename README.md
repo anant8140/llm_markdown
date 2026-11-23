@@ -8,6 +8,8 @@
 
 Markdown widget for chat apps that stream replies from an LLM.
 
+**[Try the live demo in your browser](https://anant8140.github.io/llm_markdown/)**
+
 <img src="https://raw.githubusercontent.com/anant8140/llm_markdown/main/doc/demo.gif" width="320" alt="A reply streaming in: a thinking section, an alert, a code block, a drawn diagram, math, a table and a checklist">
 
 If you render a streaming reply with a regular Markdown widget, the whole
@@ -40,8 +42,8 @@ This package fixes that:
   `:emoji:` and a few safe HTML tags.
 - Code blocks with line numbers, wrapping, collapsing, 13 themes and your
   own header buttons, in a code font that comes with the package.
-- Mermaid flowcharts, sequence diagrams and pie charts are drawn, and SVG
-  images too.
+- Mermaid flowcharts, state, class, sequence and ER diagrams, gantt charts,
+  mindmaps, timelines and pie charts are drawn, and SVG images too.
 - A selectable area with a menu for your own actions ("Ask about this").
 - Find-in-chat highlighting, a table of contents, image zoom, previews with
   `maxLines`, and a sliver mode for very long replies.
@@ -164,6 +166,7 @@ selectable. With `ListView(reverse: true)` you don't need
 | `highlightCode` | `true` | |
 | `mathBuilder` | – | draws LaTeX, see above; without it math shows as Unicode (`x²`, `α`) |
 | `showThinking` / `thinkingInitiallyExpanded` / `thinkingLabel` | `true` / `false` / English | |
+| `showToolCalls` / `toolCallBuilder` | `true` / – | the lines for the tools the model calls |
 | `showCursor` / `cursorStyle` | `true` / block | also bar, underline, dots |
 | `placeholder` | – | shown until the first text arrives, e.g. `MarkdownShimmer()` |
 | `errorBuilder` | – | shown after `controller.completeWithError(error)` |
@@ -190,7 +193,36 @@ and reads model streams directly:
 // the raw bytes of a streaming response, reasoning included
 await controller.addOpenAIStream(response.stream);
 await controller.addAnthropicStream(response.stream);
+await controller.addGeminiStream(response.stream); // streamGenerateContent?alt=sse
+await controller.addOllamaStream(response.stream); // /api/chat or /api/generate
 ```
+
+`addOpenAIStream` also reads the OpenAI-compatible endpoints of other
+providers, such as Ollama's `/v1/chat/completions`, OpenRouter, Groq and
+DeepSeek.
+
+### Tool calls and sources
+
+When the model calls a tool (a web search, one of your functions), the
+adapters record it in `controller.toolCalls`, and the reply shows a line for
+it at the top: "Using web search…", then "Used web search". Change the words
+with `MarkdownLabels(toolCall: ...)`, build the line yourself with
+`toolCallBuilder`, or hide it with `showToolCalls: false`.
+
+Pages the model cites go to `controller.sources`. With Anthropic, `[1]`
+chips are put after the text each source supports; OpenAI's text already
+carries its links, and Gemini's grounding gives the pages without marks in
+the text. Source `n` is `sources[n - 1]`:
+
+```dart
+StreamingMarkdown(
+  controller: controller,
+  onCitationTap: (n) => launchUrl(Uri.parse(controller.sources[n - 1].url!)),
+)
+```
+
+Without an adapter, call `startToolCall`, `addToolCallArguments`,
+`finishToolCall` and `addSource` yourself.
 
 ### Code blocks
 
@@ -260,9 +292,12 @@ finished at the first blank line while the reply streams.
 
 A ` ```mermaid ` block is shown as code while it streams and drawn as soon
 as its closing fence arrives, with a "Show code" switch under it.
-Flowcharts (`graph` / `flowchart`), sequence diagrams and pie charts are
-drawn natively, without a WebView. Other kinds (class, state, gantt, ...)
-stay code blocks; hand those to another renderer with `codeBlockBuilder` if
+Flowcharts (`graph` / `flowchart`, with subgraphs), state diagrams
+(`stateDiagram-v2`, with composite states and notes), class diagrams
+(`classDiagram`, with notes and cardinalities), sequence diagrams, ER
+diagrams (`erDiagram`), gantt charts, mindmaps, timelines and pie charts are
+drawn natively, without a WebView. Other kinds (journey, gitGraph,
+quadrant, ...) and lines these readers don't understand stay code blocks; hand those to another renderer with `codeBlockBuilder` if
 you need them:
 
 ```dart
@@ -369,6 +404,41 @@ incremental parser, `healIncompleteMarkdown`, `markdownToPlainText`,
 an isolate. From a Flutter app, `package:llm_markdown/parser.dart` gives the
 same thing.
 
+## Coming from flutter_markdown
+
+`flutter_markdown` is discontinued; `flutter_markdown_plus` carries it on
+for regular Markdown. For AI chat replies that stream in, the same screen
+moves over like this:
+
+| flutter_markdown / flutter_markdown_plus | llm_markdown |
+| --- | --- |
+| `MarkdownBody(data: text)` | `StreamingMarkdown.text(text)` |
+| `Markdown(data: text)`, which scrolls | `StreamingMarkdown.text(text)` in your `ListView`, or `sliver: true` in a `CustomScrollView` |
+| `setState` with the whole text on every chunk | a `StreamingMarkdownController` and `append(chunk)` |
+| `onTapLink: (text, href, title) {}` | `onLinkTap: (url) {}` |
+| `styleSheet: MarkdownStyleSheet(p:, code:, h1:, a:, ...)` | `style: StreamingMarkdownStyle.of(context).copyWith(textStyle:, inlineCodeStyle:, headingStyles:, linkStyle:, ...)`, or `StreamingMarkdownStyle.fromColors(...)`; see [Styling](#styling) |
+| `selectable: true` | wrap the chat in `MarkdownSelectionArea` |
+| `imageBuilder: (uri, title, alt) {}` | `imageBuilder: (context, uri, alt) {}` |
+| `builders: {'tag': MyElementBuilder()}` | `elementBuilders: {'tag': (context, element, isComplete) => ...}` |
+| `extensionSet: md.ExtensionSet.gitHubWeb` | on already: tables, task lists, strikethrough, autolinks, footnotes |
+| `syntaxHighlighter: ...` | built in; pick colors with `style.codeTheme` |
+| `softLineBreak: true` | `newlinesAsBreaks: true` |
+
+```dart
+// before
+MarkdownBody(
+  data: message.text,
+  onTapLink: (text, href, title) => open(href),
+)
+
+// after
+StreamingMarkdown.text(
+  message.text,
+  isComplete: message.done,
+  onLinkTap: open,
+)
+```
+
 ## Performance
 
 A 12,800-character reply streamed in 12-character chunks every 16 ms, on a
@@ -403,8 +473,9 @@ a normal parse of the full text. Golden images guard the look.
 - Raw HTML is shown as text, apart from `<sub> <sup> <kbd> <mark> <u>
   <ins> <small> <br>` and `<details>`.
 - Inline math has to fit on one line.
-- Mermaid: flowcharts, sequence diagrams and pie charts only; `subgraph`
-  boxes and styling are left out.
+- Mermaid: the kinds listed under "Diagrams and SVG" only. Styling
+  (`classDef`, `style`) is left out. Gantt charts read `YYYY-MM-DD` dates
+  and day or week durations only.
 - LaTeX layout comes from the package you give to `mathBuilder`.
 - `markdown` 7.3.1 crashes on a link definition ending in a backslash
   (`[a]: /b\`); this package works around it, and shows the text as it is

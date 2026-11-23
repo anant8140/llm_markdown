@@ -21,7 +21,8 @@ export 'src/code_options.dart'
         CodeBlockOptions,
         CodeCopyButtonBuilder,
         CodeThemes;
-export 'src/controller.dart' show StreamingMarkdownController;
+export 'src/controller.dart'
+    show MarkdownSource, MarkdownToolCall, StreamingMarkdownController;
 export 'src/extras.dart'
     show CopyReplyButton, JumpToLatest, JumpToLatestBuilder, MarkdownShimmer;
 export 'src/headings.dart' show MarkdownHeading, MarkdownHeadings;
@@ -49,3 +50,4 @@ export 'src/style.dart'
     show MarkdownDiagramStyle, StreamingMarkdownStyle, StreamingMarkdownTheme;
 export 'src/thinking.dart'
     show MarkdownThinking, MarkdownThinkingBuilder, ThinkingLabelBuilder;
+export 'src/tool_calls.dart' show MarkdownToolCallBuilder;

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
@@ -312,6 +313,139 @@ void main() {
       await controller.addAnthropicStream(_body(body));
       expect((controller.thinking, controller.text), ('Hmm.', 'Answer'));
       expect(controller.isComplete, isTrue);
+    });
+
+    test('Gemini parts, thoughts and errors', () async {
+      String chunk(List<Map<String, Object?>> parts) =>
+          'data: ${jsonEncode({
+            'candidates': [
+              {
+                'content': {'role': 'model', 'parts': parts},
+              },
+            ],
+          })}\r\n\r\n';
+      final body = [
+        chunk([
+          {'text': 'Think', 'thought': true},
+        ]),
+        chunk([
+          {'text': 'ing.', 'thought': true},
+          {'text': 'નમ'},
+        ]),
+        'data: {"candidates": [\n\n',
+        chunk([
+          {'text': 'સ્તે'},
+        ]),
+        'data: ${jsonEncode({
+          'usageMetadata': {'totalTokenCount': 9},
+        })}\r\n\r\n',
+      ].join();
+      final controller = StreamingMarkdownController();
+      await controller.addGeminiStream(_body(body, chunk: 5));
+      expect((controller.thinking, controller.text), ('Thinking.', 'નમસ્તે'));
+      expect(controller.isComplete, isTrue);
+
+      final failed = StreamingMarkdownController();
+      await expectLater(
+        failed.addGeminiStream(
+          _body(
+            'data: ${jsonEncode({
+              'error': {'code': 429, 'message': 'Resource exhausted'},
+            })}\n\n',
+          ),
+        ),
+        throwsA(isA<ModelStreamError>()),
+      );
+      expect('${failed.error}', contains('Resource exhausted'));
+    });
+
+    test('Gemini without alt=sse: one JSON array, read as it comes', () async {
+      Map<String, Object?> item(Object part) => {
+        'candidates': [
+          {
+            'content': {
+              'parts': [part],
+            },
+          },
+        ],
+      };
+      final body = StreamController<List<int>>();
+      final controller = StreamingMarkdownController();
+      final done = controller.addGeminiStream(body.stream);
+      body.add(
+        utf8.encode(
+          '\n[${jsonEncode(item({'text': 'Plan {x}', 'thought': true}))}',
+        ),
+      );
+      body.add(
+        utf8.encode(',\r\n${jsonEncode(item({'text': 'He said "}" and \\'}))}'),
+      );
+      await pumpEventQueue();
+      // shown before the body has ended
+      expect(controller.thinking, 'Plan {x}');
+      expect(controller.text, r'He said "}" and \');
+      final rest = utf8.encode(
+        ',\n${jsonEncode(item({'text': ' નમસ્તે'}))}\n]',
+      );
+      // split inside a character too
+      for (var i = 0; i < rest.length; i += 3) {
+        body.add(rest.sublist(i, i + 3 > rest.length ? rest.length : i + 3));
+      }
+      await body.close();
+      await done;
+      expect(controller.text, r'He said "}" and \ નમસ્તે');
+      expect(controller.isComplete, isTrue);
+      // a whole generateContent answer, not streamed, works too
+      final whole = StreamingMarkdownController();
+      await whole.addGeminiStream(
+        _body(jsonEncode(item({'text': 'All at once'}))),
+      );
+      expect(whole.text, 'All at once');
+    });
+
+    test('Ollama chat and generate lines', () async {
+      final chat = [
+        {
+          'message': {'role': 'assistant', 'content': '', 'thinking': 'Hmm'},
+          'done': false,
+        },
+        {
+          'message': {'role': 'assistant', 'content': 'Hi 🚀'},
+          'done': false,
+        },
+        {
+          'message': {'role': 'assistant', 'content': ''},
+          'done': true,
+        },
+        {
+          'message': {'role': 'assistant', 'content': 'after done'},
+          'done': false,
+        },
+      ].map(jsonEncode).join('\n');
+      final controller = StreamingMarkdownController();
+      await controller.addOllamaStream(_body(chat, chunk: 4));
+      expect((controller.thinking, controller.text), ('Hmm', 'Hi 🚀'));
+      expect(controller.isComplete, isTrue);
+
+      final generate = StreamingMarkdownController();
+      await generate.addOllamaStream(
+        _body(
+          '${jsonEncode({'response': 'One', 'done': false})}\n\n'
+          'garbage\n'
+          '${jsonEncode({'response': ' two', 'done': false})}',
+        ),
+      );
+      expect(generate.text, 'One two');
+      expect(generate.isComplete, isTrue);
+
+      final failed = StreamingMarkdownController();
+      await expectLater(
+        failed.addOllamaStream(
+          _body('${jsonEncode({'error': "model 'x' not found"})}\n'),
+        ),
+        throwsA(isA<ModelStreamError>()),
+      );
+      expect('${failed.error}', contains('not found'));
     });
 
     test('an error event ends the reply with the error', () async {

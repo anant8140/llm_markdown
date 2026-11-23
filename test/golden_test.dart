@@ -82,6 +82,142 @@ pie title Tokens
 ```
 ''';
 
+const _moreDiagrams = '''
+```mermaid
+stateDiagram-v2
+  [*] --> Idle
+  Idle --> Streaming : send
+  Streaming --> Idle : done
+  Streaming --> Failed : error
+  state retry <<choice>>
+  Failed --> retry
+  retry --> Streaming : again
+  retry --> [*] : give up
+```
+
+```mermaid
+classDiagram
+  class Reply {
+    <<abstract>>
+    +String text
+    +bool complete
+    +append(chunk) void
+  }
+  Reply <|-- ChatReply
+  Chat "1" *-- "many" Reply
+  Chat o-- User
+  ChatReply ..> Parser : uses
+```
+''';
+
+const _otherKinds = '''
+```mermaid
+flowchart TD
+  subgraph api [API]
+    G[Gateway] --> A[Auth]
+    G --> O[Orders]
+  end
+  subgraph data [Data kept for years]
+    DB[(Postgres)]
+  end
+  U[User] --> G
+  U --> CDN[CDN]
+  A --> DB
+  O --> DB
+```
+
+```mermaid
+stateDiagram-v2
+  [*] --> Idle
+  Idle --> Busy : start
+  state Busy {
+    [*] --> Fetching
+    Fetching --> Parsing
+    Parsing --> [*]
+  }
+  Busy --> Idle : done
+  note right of Idle : waiting
+  note right of Busy : working
+```
+
+```mermaid
+classDiagram
+  Chat "1" *-- "many" Message : holds
+  Chat "1" o-- "1..*" User
+  note for Chat "one per thread"
+```
+
+```mermaid
+erDiagram
+  "Customer Account" only one to zero or many ORDER : places
+  ORDER ||--|{ ITEM : contains
+  "Customer Account" {
+    string name PK
+    int age
+  }
+```
+
+```mermaid
+gantt
+  title Release
+  dateFormat YYYY-MM-DD
+  section Build
+  Design :done, a1, 2024-01-01, 3d
+  Code :active, a2, after a1, 1w
+  section Ship
+  Test :crit, 2024-01-08, 2024-01-12
+  Launch :milestone, m1, 2024-01-15, 2d
+```
+
+```mermaid
+mindmap
+  root((Plan))
+    Goals
+      Speed
+      id1[Cost]
+    Risks
+      r)Scope(
+      b))Delay((
+```
+
+```mermaid
+stateDiagram-v2
+  direction LR
+  A --> B
+  B --> C
+  A --> C
+  note right of B : hi
+  note left of A : lo
+  state D {
+    Wait
+    Run --> Wait
+  }
+  C --> D
+  note right of D : boxed
+```
+
+```mermaid
+gantt
+  dateFormat D MMM YYYY
+  axisFormat %a %e
+  excludes weekends
+  A :a, 4 Jan 2024, 2d
+  B :b, after a, until c
+  C :c, 12 Jan 2024, 1d
+```
+
+```mermaid
+timeline
+  title History
+  section Early
+    2002 : LinkedIn
+    2004 : Facebook : Google
+    10:30 : Talk: part one
+  section Later
+    2010 : Instagram
+```
+''';
+
 Widget _scene({
   required String text,
   bool dark = false,
@@ -156,6 +292,24 @@ void main() {
 
   testWidgets('diagrams', (tester) async {
     await shoot(tester, _scene(text: _diagrams), 'diagrams', height: 1100);
+  });
+
+  testWidgets('state and class diagrams', (tester) async {
+    await shoot(
+      tester,
+      _scene(text: _moreDiagrams),
+      'state_class_diagrams',
+      height: 1080,
+    );
+  });
+
+  testWidgets('more diagram kinds', (tester) async {
+    await shoot(
+      tester,
+      _scene(text: _otherKinds),
+      'more_diagram_kinds',
+      height: 2900,
+    );
   });
 
   testWidgets('the selection menu', (tester) async {

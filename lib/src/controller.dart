@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/foundation.dart';
 
 import 'package:llm_markdown_parser/llm_markdown_parser.dart';
@@ -90,11 +92,86 @@ class StreamingMarkdownController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Marks the reply as ended.
+  /// Marks the reply as ended. Tool calls still running are marked done.
   void complete() {
     if (_isComplete) return;
     _isComplete = true;
+    _finishToolCalls();
     notifyListeners();
+  }
+
+  /// The pages and documents the model cited, in the order they were first
+  /// cited. Source `n` is `sources[n - 1]`, so a `[n]` chip given to
+  /// `StreamingMarkdown.onCitationTap` can be looked up here.
+  ///
+  /// `addAnthropicStream` puts `[n]` after the text each source supports;
+  /// `addOpenAIStream` and `addGeminiStream` only fill this list, since
+  /// their text already carries links or no marks at all.
+  List<MarkdownSource> get sources => _sourcesView;
+  final List<MarkdownSource> _sources = [];
+  late final List<MarkdownSource> _sourcesView = UnmodifiableListView(_sources);
+
+  /// Adds [source] to [sources] and returns its number, starting at 1. A
+  /// source with the same address (or, without one, the same title) that is
+  /// already there keeps its number.
+  int addSource(MarkdownSource source) {
+    final known = _sources.indexWhere((other) => other._sameAs(source));
+    if (known != -1) return known + 1;
+    _sources.add(source);
+    notifyListeners();
+    return _sources.length;
+  }
+
+  /// The tools the model called during this reply, such as a web search
+  /// or one of your functions, in order. `StreamingMarkdown` shows them at
+  /// the top of the reply, wherever in the reply they were made; see
+  /// `StreamingMarkdown.toolCallBuilder`.
+  List<MarkdownToolCall> get toolCalls => _toolCallsView;
+  final List<MarkdownToolCall> _toolCalls = [];
+  late final List<MarkdownToolCall> _toolCallsView = UnmodifiableListView(
+    _toolCalls,
+  );
+
+  /// Records that the model started calling the tool [name]; [id] tells
+  /// calls apart. Calling it again for a known [id] only fills in a name
+  /// that was empty.
+  void startToolCall(String id, String name) {
+    final i = _toolCalls.indexWhere((call) => call.id == id);
+    if (i == -1) {
+      _toolCalls.add(MarkdownToolCall(id: id, name: name));
+    } else if (_toolCalls[i].name.isEmpty && name.isNotEmpty) {
+      _toolCalls[i] = _toolCalls[i]._copy(name: name);
+    } else {
+      return;
+    }
+    notifyListeners();
+  }
+
+  /// Adds [chunk] to the arguments of the tool call [id], which are JSON
+  /// text that arrives in pieces.
+  void addToolCallArguments(String id, String chunk) {
+    final i = _toolCalls.indexWhere((call) => call.id == id);
+    if (i == -1 || chunk.isEmpty) return;
+    _toolCalls[i] = _toolCalls[i]._copy(
+      arguments: _toolCalls[i].arguments + chunk,
+    );
+    notifyListeners();
+  }
+
+  /// Marks the tool call [id] as finished.
+  void finishToolCall(String id) {
+    final i = _toolCalls.indexWhere((call) => call.id == id);
+    if (i == -1 || _toolCalls[i].isDone) return;
+    _toolCalls[i] = _toolCalls[i]._copy(isDone: true);
+    notifyListeners();
+  }
+
+  void _finishToolCalls() {
+    for (var i = 0; i < _toolCalls.length; i++) {
+      if (!_toolCalls[i].isDone) {
+        _toolCalls[i] = _toolCalls[i]._copy(isDone: true);
+      }
+    }
   }
 
   /// Whether revealing the text is paused; see [pause].
@@ -141,6 +218,7 @@ class StreamingMarkdownController extends ChangeNotifier {
     if (_isComplete) return;
     _error = error;
     _stackTrace = stackTrace;
+    _finishToolCalls();
     _isComplete = true;
     notifyListeners();
   }
@@ -152,6 +230,8 @@ class StreamingMarkdownController extends ChangeNotifier {
     _text = text;
     _isComplete = isComplete;
     _thinking = '';
+    _sources.clear();
+    _toolCalls.clear();
     _error = null;
     _stackTrace = null;
     _generation++;
@@ -176,4 +256,87 @@ class StreamingMarkdownController extends ChangeNotifier {
     }
     if (_generation == generation) complete();
   }
+}
+
+/// A web page or document the model cited; see
+/// [StreamingMarkdownController.sources].
+@immutable
+class MarkdownSource {
+  /// Creates a source; any part may be missing.
+  const MarkdownSource({this.url, this.title, this.citedText});
+
+  /// The address of the page, when it has one.
+  final String? url;
+
+  /// The title of the page or document.
+  final String? title;
+
+  /// The words of the source the model relied on, when the API says.
+  final String? citedText;
+
+  // the same page, or the same titled document; sources with neither are
+  // never taken for each other
+  bool _sameAs(MarkdownSource other) => url != null || other.url != null
+      ? url == other.url
+      : title != null && title == other.title;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MarkdownSource &&
+      other.url == url &&
+      other.title == title &&
+      other.citedText == citedText;
+
+  @override
+  int get hashCode => Object.hash(url, title, citedText);
+
+  @override
+  String toString() => 'MarkdownSource(${url ?? title})';
+}
+
+/// A tool the model called, such as a web search or one of your functions;
+/// see [StreamingMarkdownController.toolCalls].
+@immutable
+class MarkdownToolCall {
+  /// Creates a record of a tool call.
+  const MarkdownToolCall({
+    required this.id,
+    required this.name,
+    this.arguments = '',
+    this.isDone = false,
+  });
+
+  /// Tells calls apart; given by the API.
+  final String id;
+
+  /// The tool's name, such as `web_search` or `get_weather`.
+  final String name;
+
+  /// The arguments as JSON text, possibly not complete yet.
+  final String arguments;
+
+  /// Whether the call has finished.
+  final bool isDone;
+
+  MarkdownToolCall _copy({String? name, String? arguments, bool? isDone}) =>
+      MarkdownToolCall(
+        id: id,
+        name: name ?? this.name,
+        arguments: arguments ?? this.arguments,
+        isDone: isDone ?? this.isDone,
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      other is MarkdownToolCall &&
+      other.id == id &&
+      other.name == name &&
+      other.arguments == arguments &&
+      other.isDone == isDone;
+
+  @override
+  int get hashCode => Object.hash(id, name, arguments, isDone);
+
+  @override
+  String toString() => 'MarkdownToolCall($name${isDone ? ', done' : ''})';
 }

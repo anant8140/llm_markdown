@@ -63,6 +63,13 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _smooth = true;
   int _run = 0;
 
+  // what is streamed: the sample reply, or Markdown the visitor typed
+  String _text = _answer;
+  String _question = 'How do I show streaming Markdown in Flutter?';
+
+  // milliseconds between chunks, about
+  int _delay = 40;
+
   @override
   void initState() {
     super.initState();
@@ -76,22 +83,62 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  /// Plays [_answer] back in uneven chunks, the way a model streams tokens.
+  /// Plays [_text] back in uneven chunks, the way a model streams tokens.
   Future<void> _ask() async {
     final run = ++_run;
     _reply.reset();
+    final text = _text;
     final random = Random();
-    var i = 0;
-    while (i < _answer.length) {
-      await Future<void>.delayed(
-        Duration(milliseconds: 20 + random.nextInt(60)),
-      );
+    if (text == _answer) {
+      // the sample reply looks something up first and cites two pages
+      _reply
+        ..addSource(
+          const MarkdownSource(
+            url: 'https://pub.dev/packages/llm_markdown',
+            title: 'llm_markdown on pub.dev',
+          ),
+        )
+        ..addSource(
+          const MarkdownSource(
+            url: 'https://github.com/anant8140/llm_markdown',
+            title: 'llm_markdown on GitHub',
+          ),
+        )
+        ..startToolCall('search', 'web_search');
+      await Future<void>.delayed(Duration(milliseconds: _delay * 20));
       if (!mounted || run != _run) return;
-      final end = min(_answer.length, i + 2 + random.nextInt(14));
-      _reply.append(_answer.substring(i, end));
+      _reply.finishToolCall('search');
+    }
+    var i = 0;
+    while (i < text.length) {
+      if (_delay > 0) {
+        await Future<void>.delayed(
+          Duration(milliseconds: _delay ~/ 2 + random.nextInt(_delay + 1)),
+        );
+      }
+      if (!mounted || run != _run) return;
+      final end = min(text.length, i + 2 + random.nextInt(14));
+      _reply.append(text.substring(i, end));
       i = end;
     }
     _reply.complete();
+  }
+
+  // Lets the visitor paste their own Markdown and watch it stream.
+  Future<void> _tryYourOwn() async {
+    final text = await showDialog<String>(
+      context: context,
+      builder: (context) =>
+          _PasteDialog(initial: _text == _answer ? _sample : _text),
+    );
+    if (text == null || !mounted) return;
+    setState(() {
+      _text = text;
+      _question = text == _answer
+          ? 'How do I show streaming Markdown in Flutter?'
+          : 'Your Markdown';
+    });
+    unawaited(_ask());
   }
 
   void _say(String message) => ScaffoldMessenger.of(context)
@@ -105,6 +152,26 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         title: const Text('llm_markdown'),
         actions: [
+          IconButton(
+            tooltip: 'Stream your own Markdown',
+            icon: const Icon(Icons.edit_note),
+            onPressed: _tryYourOwn,
+          ),
+          PopupMenuButton<int>(
+            tooltip: 'Streaming speed',
+            icon: const Icon(Icons.speed),
+            initialValue: _delay,
+            onSelected: (delay) {
+              setState(() => _delay = delay);
+              unawaited(_ask());
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 120, child: Text('Slow')),
+              PopupMenuItem(value: 40, child: Text('Normal')),
+              PopupMenuItem(value: 10, child: Text('Fast')),
+              PopupMenuItem(value: 0, child: Text('All at once')),
+            ],
+          ),
           IconButton(
             tooltip: _smooth ? 'Turn smoothing off' : 'Turn smoothing on',
             icon: Icon(_smooth ? Icons.waves : Icons.bolt),
@@ -142,9 +209,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       color: colors.primaryContainer,
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Text(
-                      'How do I show streaming Markdown in Flutter?',
-                    ),
+                    child: Text(_question),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -166,7 +231,13 @@ class _ChatScreenState extends State<ChatScreen> {
                     onErrorFallback: (error) => Text(tex),
                   ),
                   onLinkTap: (url) => _say('Open $url'),
-                  onCitationTap: (number) => _say('Source $number'),
+                  onCitationTap: (number) {
+                    final sources = _reply.sources;
+                    final source = number >= 1 && number <= sources.length
+                        ? sources[number - 1]
+                        : null;
+                    _say(source?.title ?? source?.url ?? 'Source $number');
+                  },
                 ),
                 const SizedBox(height: 80),
               ],
@@ -199,6 +270,76 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
+
+// The box where a visitor pastes Markdown; it owns its text controller,
+// which must outlive the dialog's closing animation.
+class _PasteDialog extends StatefulWidget {
+  const _PasteDialog({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_PasteDialog> createState() => _PasteDialogState();
+}
+
+class _PasteDialogState extends State<_PasteDialog> {
+  late final TextEditingController _field = TextEditingController(
+    text: widget.initial,
+  );
+
+  @override
+  void dispose() {
+    _field.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Stream your own Markdown'),
+    content: SizedBox(
+      width: 560,
+      child: TextField(
+        controller: _field,
+        maxLines: 14,
+        minLines: 8,
+        autofocus: true,
+        style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+        decoration: const InputDecoration(
+          border: OutlineInputBorder(),
+          hintText: 'Paste a reply from any chatbot here',
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context, _answer),
+        child: const Text('Sample reply'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, _field.text),
+        child: const Text('Stream it'),
+      ),
+    ],
+  );
+}
+
+// put in the box the first time, to show what can be streamed
+const String _sample = r'''
+# Paste anything here
+
+A **bold** claim, some `code`, a [link](https://flutter.dev) and a table:
+
+| Model | Speed |
+| ----- | ----- |
+| Small | Fast  |
+| Large | Slow  |
+
+```mermaid
+classDiagram
+  Reply <|-- ChatReply
+  Chat "1" *-- "many" Reply
+```
+''';
 
 const String _answer = r'''
 <think>
@@ -240,6 +381,17 @@ flowchart TD
   B -->|no| D([Heal and parse again])
   C --> E((Show))
   D --> E
+```
+
+The life of a reply, as a state diagram:
+
+```mermaid
+stateDiagram-v2
+  [*] --> Streaming
+  Streaming --> Done : complete()
+  Streaming --> Failed : error
+  Failed --> Streaming : retry
+  Done --> [*]
 ```
 
 ### A bit of math

@@ -31,6 +31,7 @@ class MarkdownLabels {
     this.alertTitles = const {},
     this.spoilerHint = 'Spoiler, tap to show',
     this.citation,
+    this.toolCall,
   });
 
   /// The copy button of a code block. Null uses the platform's own word for
@@ -67,6 +68,10 @@ class MarkdownLabels {
   /// "Source N".
   final String Function(int number)? citation;
 
+  /// The line shown for a tool call, given the tool's name and whether it
+  /// has finished; defaults to "Using web search…" and "Used web search".
+  final String Function(String name, bool done)? toolCall;
+
   @override
   bool operator ==(Object other) =>
       other is MarkdownLabels &&
@@ -79,7 +84,8 @@ class MarkdownLabels {
       other.details == details &&
       mapEquals(other.alertTitles, alertTitles) &&
       other.spoilerHint == spoilerHint &&
-      other.citation == citation;
+      other.citation == citation &&
+      other.toolCall == toolCall;
 
   @override
   int get hashCode => Object.hash(
@@ -93,5 +99,6 @@ class MarkdownLabels {
     Object.hashAllUnordered(alertTitles.entries.map((e) => (e.key, e.value))),
     spoilerHint,
     citation,
+    toolCall,
   );
 }

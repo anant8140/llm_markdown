@@ -1,3 +1,55 @@
+## 0.5.0
+
+* `addGeminiStream` reads a Gemini `streamGenerateContent?alt=sse` response;
+  thought parts go to the thinking section.
+* `addOllamaStream` reads Ollama's `/api/chat` and `/api/generate` streams
+  (one JSON object per line), thinking included.
+* `addGeminiStream` also reads `streamGenerateContent` without `alt=sse`,
+  where the body is one JSON array that arrives piece by piece.
+* Tool calls: the controller has `toolCalls` (`startToolCall`,
+  `addToolCallArguments`, `finishToolCall`), and every adapter fills it from
+  its API's function calls and server tools such as web search. The reply
+  shows a "Using web search…" line per call at the top; see
+  `showToolCalls`, `toolCallBuilder` and `MarkdownLabels.toolCall`.
+* Sources: the controller has `sources` (`addSource`, `MarkdownSource`).
+  Anthropic citations, OpenAI `url_citation` annotations and Gemini search
+  grounding are collected there, and Anthropic citations put `[n]` chips
+  after the text they support.
+* Mermaid state diagrams (`stateDiagram` / `stateDiagram-v2`) are drawn: the
+  start dot, the end ring, `<<choice>>` diamonds, `state "..." as X`, state
+  descriptions and the states inside a composite state.
+* Mermaid class diagrams (`classDiagram`) are drawn: classes with their
+  fields and methods, `<<interface>>`-style annotations, generics, and the
+  inheritance, realization, composition, aggregation, association and
+  dependency lines with their own ends.
+* Flowchart `subgraph`s are drawn as titled boxes around their nodes, and
+  edges to a subgraph end on its box.
+* State diagrams draw composite states as boxes around their states, and
+  notes (`note right of X`, also over several lines).
+* Class diagrams draw notes (`note for X`), and cardinalities near each end
+  of the line instead of in the middle.
+* New Mermaid kinds are drawn: ER diagrams (`erDiagram`, with attributes and
+  crow's-foot ends), gantt charts (`YYYY-MM-DD` dates, day and week
+  durations, `after`, done / active / crit / milestone), mindmaps and
+  timelines. What they can't read stays a code block.
+* A reply ended by the app with `complete()` while an `add...Stream` is
+  still reading (a stop button) now stays as it is: the rest of the stream
+  is ignored. Before, the next chunk threw a `StateError` out of the
+  adapter.
+* `reset()` or `complete()` while an `add...Stream` is reading cancels the
+  response body right away, which closes its connection, instead of
+  waiting for the server's next chunk.
+* Code no longer shows ligatures: the bundled JetBrains Mono drew `<|`, `->`
+  or `!=` as one symbol, so code didn't show the characters that were
+  written. `StreamingMarkdownStyle.codeFont` turns them off.
+* `addOpenAIStream` shows a refusal (`delta.refusal`) as the answer instead
+  of an empty reply.
+* Two edge labels that would land on one spot, as on a pair of edges going
+  both ways between two nodes, no longer cover each other.
+* The example app runs on the web, and is published as a live demo:
+  https://anant8140.github.io/llm_markdown/. Visitors can paste their own
+  Markdown, pick the streaming speed and switch the theme.
+
 ## 0.4.1
 
 * The menu of `MarkdownSelectionArea` uses the app's font. On Android, in a

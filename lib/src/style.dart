@@ -242,11 +242,16 @@ class StreamingMarkdownStyle {
   /// JetBrains Mono, which comes with this package, so code looks the same
   /// on every platform, the web included. System monospace fonts are the
   /// fallback.
+  ///
+  /// Its ligatures are off, so code shows the characters that were written:
+  /// `<|`, `->` and `!=` stay two characters instead of turning into one
+  /// symbol. Add `FontFeature.enable('calt')` to a copy to have them.
   static const TextStyle codeFont = TextStyle(
     // written out, because TextStyle's `package` would also put the prefix
     // on the system fonts in the fallback list
     fontFamily: 'packages/llm_markdown/JetBrainsMono',
     fontFamilyFallback: _monospaceFallback,
+    fontFeatures: [FontFeature.disable('calt'), FontFeature.disable('liga')],
   );
 
   /// The style of paragraph text.

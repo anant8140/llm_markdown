@@ -19,6 +19,7 @@ import 'safety.dart';
 import 'smoothing.dart';
 import 'style.dart';
 import 'thinking.dart';
+import 'tool_calls.dart';
 
 /// Shows Markdown that arrives in pieces, such as an AI chat reply, without
 /// flicker or broken syntax.
@@ -86,6 +87,8 @@ class StreamingMarkdown extends StatefulWidget {
     this.diagrams = true,
     this.labels,
     this.thinkingBuilder,
+    this.showToolCalls = true,
+    this.toolCallBuilder,
     this.cursorBuilder,
     this.autoScrollController,
   }) : assert(maxLines == null || maxLines > 0, 'maxLines must be positive'),
@@ -142,6 +145,8 @@ class StreamingMarkdown extends StatefulWidget {
     this.diagrams = true,
     this.labels,
     this.thinkingBuilder,
+    this.showToolCalls = true,
+    this.toolCallBuilder,
     this.cursorBuilder,
     this.autoScrollController,
   }) : assert(maxLines == null || maxLines > 0, 'maxLines must be positive'),
@@ -198,6 +203,8 @@ class StreamingMarkdown extends StatefulWidget {
     this.diagrams = true,
     this.labels,
     this.thinkingBuilder,
+    this.showToolCalls = true,
+    this.toolCallBuilder,
     this.cursorBuilder,
     this.autoScrollController,
   }) : assert(maxLines == null || maxLines > 0, 'maxLines must be positive'),
@@ -389,6 +396,14 @@ class StreamingMarkdown extends StatefulWidget {
   /// Builds the thinking section yourself, in place of the built-in
   /// collapsible one.
   final MarkdownThinkingBuilder? thinkingBuilder;
+
+  /// Whether the tools the model calls ([StreamingMarkdownController.toolCalls])
+  /// are listed at the top of the reply, one line each.
+  final bool showToolCalls;
+
+  /// Builds the line for one tool call yourself, in place of the built-in
+  /// "Using web search…" line.
+  final MarkdownToolCallBuilder? toolCallBuilder;
 
   /// Builds the cursor shown while text arrives, in place of the built-in
   /// one ([cursorStyle] is then not used).
@@ -957,6 +972,26 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     final errorBuilder = widget.errorBuilder;
     if (complete && error != null && errorBuilder != null) {
       children.add(errorBuilder(context, error));
+    }
+
+    final calls = widget.showToolCalls
+        ? _controller.toolCalls
+        : const <MarkdownToolCall>[];
+    if (calls.isNotEmpty) {
+      final toolCallBuilder = widget.toolCallBuilder;
+      final label = _settings.labels.toolCall ?? defaultToolCallLabel;
+      children.insertAll(0, [
+        for (final call in calls)
+          toolCallBuilder != null
+              ? toolCallBuilder(context, call)
+              : ToolCallLine(
+                  key: ValueKey('tool ${call.id}'),
+                  label: label(call.name, call.isDone),
+                  done: call.isDone,
+                  color: style.accentColor,
+                  textStyle: style.textStyle,
+                ),
+      ]);
     }
 
     if (thinking != null) {
