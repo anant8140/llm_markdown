@@ -226,6 +226,40 @@ void main() {
     expect(tapped(), 'Fou');
   });
 
+  testWidgets('skipping when the limit hides nothing keeps the limit', (
+    tester,
+  ) async {
+    limit.value = 5;
+    final shown = await _pumpLimited(
+      tester,
+      controller,
+      limit,
+      smoothing: const Smoothing.adaptive(),
+      tapToSkip: true,
+    );
+    controller.append('Hello');
+    await tester.pump(const Duration(milliseconds: 16));
+    // the voice has caught up with the text; skipping only ends the reveal
+    controller.skipAnimation();
+    await tester.pump();
+    await tester.pump();
+    expect(shown(), 'Hello');
+    controller.append(' world');
+    await _settle(tester);
+    expect(shown(), 'Hello', reason: 'the voice has not read "world" yet');
+
+    controller.reset();
+    controller.append('Hi');
+    await tester.pump();
+    limit.value = 2;
+    await tester.pump(const Duration(milliseconds: 16));
+    await tester.tap(find.byType(StreamingMarkdown));
+    await tester.pump();
+    controller.append(' there');
+    await _settle(tester);
+    expect(shown(), 'Hi', reason: 'a tap keeps it too');
+  });
+
   testWidgets('onComplete waits until the limit reaches the end', (
     tester,
   ) async {

@@ -1,3 +1,8 @@
+## Unreleased
+
+* A request that can't be built, such as a `body` that isn't JSON, ends the
+  stream with the error instead of leaving it waiting forever.
+
 ## 0.2.0
 
 * `SseClient`: a base URL, headers built for each request (async, so a

@@ -1,3 +1,9 @@
+## Unreleased
+
+* OpenAI-compatible servers that leave `index` out of streamed tool calls:
+  parallel calls are kept apart instead of merged into one, which failed
+  with "not a JSON object".
+
 ## 0.1.1
 
 * Checked against a real Ollama server, through its own API and its

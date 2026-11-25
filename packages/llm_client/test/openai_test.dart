@@ -198,6 +198,51 @@ void main() {
       );
     });
 
+    test('tool calls without an index, from compatible servers', () async {
+      final fake = sseFake([
+        // two whole calls in one chunk, neither with an index
+        chunk({
+          'tool_calls': [
+            {
+              'id': 'a',
+              'function': {'name': 'f1', 'arguments': '{"x":1}'},
+            },
+            {
+              'id': 'b',
+              'function': {'name': 'f2', 'arguments': '{"y":'},
+            },
+          ],
+        }),
+        // a later piece of the second call, with no id or name
+        chunk({
+          'tool_calls': [
+            {
+              'function': {'arguments': '2}'},
+            },
+          ],
+        }),
+        // a third call with a name but no id
+        chunk({
+          'tool_calls': [
+            {
+              'function': {'name': 'f3', 'arguments': '{}'},
+            },
+          ],
+        }),
+        chunk({}, finish: 'tool_calls'),
+        '[DONE]',
+      ]);
+      final events = await collect(
+        OpenAIProvider(apiKey: 'k', client: fake).stream(plainRequest),
+      );
+      expect(events.where((e) => e.startsWith('call:')), [
+        'call:a:f1:{"x":1}',
+        'call:b:f2:{"y":2}',
+        'call:call_2:f3:{}',
+      ]);
+      expect(events.last, 'done:toolCalls:tool_calls');
+    });
+
     test('thinking from compatible servers', () async {
       final fake = sseFake([
         chunk({'reasoning_content': 'Hm'}),

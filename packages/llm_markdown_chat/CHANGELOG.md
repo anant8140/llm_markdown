@@ -1,3 +1,8 @@
+## Unreleased
+
+* `ChatListController.delete` after `dispose` is ignored, for a delete
+  confirmed in a dialog after the screen closed; it used to throw.
+
 ## 0.2.0
 
 * Message actions: thumbs up and down under replies with `onFeedback`;

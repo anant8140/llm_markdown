@@ -129,6 +129,7 @@ class _OpenAIDecoder extends WireDecoder<SseEvent> {
   // argument pieces that came before the call's name
   final _early = <int, StringBuffer>{};
   final _ids = <int, String>{};
+  int? _last;
   LlmUsage? _usage;
   String? _finish;
   var _sawFinish = false;
@@ -185,11 +186,11 @@ class _OpenAIDecoder extends WireDecoder<SseEvent> {
   }
 
   void _toolCall(Map<Object?, Object?> call, Emit emit) {
-    final index = _int(call['index']) ?? 0;
     final function = call['function'];
     final name = function is Map ? function['name'] : null;
     final arguments = function is Map ? function['arguments'] : null;
     final id = call['id'];
+    final index = _last = _int(call['index']) ?? _guessIndex(id, name);
     if (id is String && id.isNotEmpty) _ids.putIfAbsent(index, () => id);
 
     var builder = _calls[index];
@@ -211,6 +212,20 @@ class _OpenAIDecoder extends WireDecoder<SseEvent> {
         emit(builder.add(arguments));
       }
     }
+  }
+
+  /// For servers that leave out `index`: a part with a new id, or a name
+  /// while the last call already has one, starts the next call; anything
+  /// else continues the last call.
+  int _guessIndex(Object? id, Object? name) {
+    final last = _last;
+    if (last == null) return 0;
+    final hasId = id is String && id.isNotEmpty;
+    final known = _ids[last];
+    final startsNew = hasId
+        ? known != null && known != id
+        : name is String && name.isNotEmpty && _calls[last] != null;
+    return startsNew ? last + 1 : last;
   }
 
   void _closeCalls(Emit emit) {

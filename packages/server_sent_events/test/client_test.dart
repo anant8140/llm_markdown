@@ -109,6 +109,23 @@ void main() {
     await closed.future.timeout(const Duration(seconds: 5));
   });
 
+  test('a body that is not JSON ends the stream with the error', () async {
+    final statuses = <SseStatus>[];
+    final error =
+        await connectSse(
+              base,
+              method: 'POST',
+              body: {'when': DateTime(2026)},
+              onStatus: statuses.add,
+            )
+            .toList()
+            .timeout(const Duration(seconds: 5))
+            .then<Object?>((_) => null, onError: (Object e) => e);
+    expect(error, isA<JsonUnsupportedObjectError>());
+    expect(statuses.last, SseStatus.closed);
+    expect(requests, isEmpty);
+  });
+
   test('an error status gives the body, and is not retried', () async {
     handle = (request, _) async {
       request.response

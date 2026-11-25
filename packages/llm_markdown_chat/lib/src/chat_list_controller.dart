@@ -189,6 +189,8 @@ class ChatListController extends ChangeNotifier {
   /// Removes [chat] and disposes its controller. When it was the selected
   /// one, the chat after it (or else the one before it) is selected.
   void delete(ChatSession chat) {
+    // a delete confirmed in a dialog may arrive after dispose
+    if (_disposed) return;
     final index = _chats.indexOf(chat);
     if (index == -1) return;
     _chats.removeAt(index);

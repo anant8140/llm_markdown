@@ -5,7 +5,8 @@
   text-to-speech progress, so nothing appears before the voice reaches it.
   Null (the default) changes nothing; smoothing still applies up to the
   limit, lowering it hides text again, and a tap or `skipAnimation()` shows
-  everything.
+  everything when the limit hides text; when the voice has caught up, a
+  skip only ends the reveal and later text still waits for the voice.
 
 ## 0.7.0
 

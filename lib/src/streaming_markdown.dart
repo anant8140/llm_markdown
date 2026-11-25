@@ -626,9 +626,16 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     setState(() {
       _ticker.stop();
       _carry = 0;
-      _limitLifted = true;
+      _liftLimitIfHiding();
       _shown = _controller.text.length;
     });
+  }
+
+  // Skipping shows everything; it lifts the limit only when the limit is
+  // what hides text, so a skip while the voice has caught up just ends the
+  // reveal and later text still waits for the voice.
+  void _liftLimitIfHiding() {
+    if (_target < _controller.text.length) _limitLifted = true;
   }
 
   void _onLimitChanged() {
@@ -778,7 +785,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     if (_controller.skipCount != _seenSkips) {
       _seenSkips = _controller.skipCount;
       _ticker.stop();
-      _limitLifted = true;
+      _liftLimitIfHiding();
       _shown = text.length;
     } else if (!_moveToTarget()) {
       return;

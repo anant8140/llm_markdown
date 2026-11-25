@@ -328,20 +328,26 @@ class _Connection {
       return;
     }
     if (cancelled) return;
-    final own = headers;
-    if (own != null) request.headers.addAll(own);
-    final last = id;
-    if (last != null) request.headers['Last-Event-ID'] = last;
-    switch (body) {
-      case null:
-        break;
-      case String text:
-        request.body = text;
-      case List<int> bytes:
-        request.bodyBytes = bytes;
-      default:
-        request.headers.putIfAbsent('Content-Type', () => 'application/json');
-        request.body = jsonEncode(body);
+    try {
+      final own = headers;
+      if (own != null) request.headers.addAll(own);
+      final last = id;
+      if (last != null) request.headers['Last-Event-ID'] = last;
+      switch (body) {
+        case null:
+          break;
+        case String text:
+          request.body = text;
+        case List<int> bytes:
+          request.bodyBytes = bytes;
+        default:
+          request.headers.putIfAbsent('Content-Type', () => 'application/json');
+          request.body = jsonEncode(body);
+      }
+    } catch (error, stackTrace) {
+      // a body that isn't JSON, for example; retrying can't help
+      _close(error, stackTrace);
+      return;
     }
 
     final http.StreamedResponse response;

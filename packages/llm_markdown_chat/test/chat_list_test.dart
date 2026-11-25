@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
@@ -281,6 +282,32 @@ void main() {
       );
       expect(find.text('Mine'), findsOneWidget);
       expect(_button('Delete Mine'), findsNothing);
+      semantics.dispose();
+    });
+
+    testWidgets('a delete confirmed after the list was disposed is ignored', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final list = ChatListController(onReply: _echo);
+      list.create(title: 'Old');
+      final answer = Completer<bool>();
+      await tester.pumpWidget(
+        _app(
+          ChatListView(
+            controller: list,
+            confirmDelete: (chat) => answer.future,
+          ),
+        ),
+      );
+      await tester.tap(_button('Delete Old'));
+      await tester.pump();
+      // the screen closes while the dialog is open
+      await tester.pumpWidget(const SizedBox());
+      list.dispose();
+      answer.complete(true);
+      await tester.pump();
+      expect(tester.takeException(), isNull);
       semantics.dispose();
     });
 
