@@ -126,3 +126,17 @@ int wordBoundaryAtOrAfter(String text, int index, int shown, bool complete) {
   if (next == -1) return complete ? text.length : shown;
   return next;
 }
+
+// For RevealUnit.word: [index] when it falls between words, otherwise the
+// start of the word it cuts, so a limit inside a word shows none of it.
+int wordBoundaryAtOrBefore(String text, int index) {
+  if (index <= 0 || index >= text.length) return index.clamp(0, text.length);
+  if (_space.hasMatch(text[index - 1]) || _space.hasMatch(text[index])) {
+    return index;
+  }
+  var start = index;
+  while (start > 0 && !_space.hasMatch(text[start - 1])) {
+    start--;
+  }
+  return start;
+}

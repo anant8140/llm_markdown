@@ -265,7 +265,8 @@ class StreamingMarkdown extends StatefulWidget {
   /// users who don't use the voice; the rest is then revealed as usual.
   ///
   /// [smoothing] still applies up to the limit. A position inside a letter
-  /// shows the whole letter. Lowering the limit hides text again. Tapping
+  /// shows the whole letter; with [RevealUnit.word], a position inside a
+  /// word shows none of that word. Lowering the limit hides text again. Tapping
   /// the reply, or [StreamingMarkdownController.skipAnimation], shows
   /// everything and ignores the limit until the text is replaced or
   /// replayed. [onComplete] is called once the limit reaches the end of a
@@ -618,6 +619,10 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     final text = _controller.text;
     final limit = _limitLifted ? null : widget.revealLimit?.value;
     if (limit == null || limit >= text.length) return text.length;
+    // widget.smoothing, not _smoothing: this also runs in initState
+    if (widget.smoothing.enabled && widget.smoothing.unit == RevealUnit.word) {
+      return wordBoundaryAtOrBefore(text, limit);
+    }
     return graphemeBoundaryAtOrAfter(text, limit);
   }
 

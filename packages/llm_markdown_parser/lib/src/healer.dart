@@ -372,7 +372,14 @@ String _closeDelimiters(String line) {
     if (masked.openCodeStart + masked.openCodeLength == line.length) {
       result = line.substring(0, masked.openCodeStart);
     } else {
-      result = '$result${'`' * masked.openCodeLength}';
+      // a closing run that has only partly arrived ("``co`") would make a
+      // run of the wrong length with the added one, so it is dropped
+      final contentStart = masked.openCodeStart + masked.openCodeLength;
+      var end = result.length;
+      while (end > contentStart && result.codeUnitAt(end - 1) == _backtick) {
+        end--;
+      }
+      result = '${result.substring(0, end)}${'`' * masked.openCodeLength}';
     }
   }
   if (stack.isEmpty) return result;

@@ -117,7 +117,19 @@ void main() {
     limit.value = 6; // inside "two"
     controller.append(_reply);
     await _settle(tester);
-    expect(shown(), 'One tw');
+    expect(shown(), 'One ', reason: 'whole words only');
+
+    limit.value = 7; // right after "two"
+    await _settle(tester);
+    expect(shown(), 'One two');
+
+    limit.value = 10; // inside "three": lowering keeps whole words too
+    await _settle(tester);
+    expect(shown(), 'One two ');
+    limit.value = 5;
+    await tester.pump();
+    await tester.pump();
+    expect(shown(), 'One ');
   });
 
   testWidgets('no limit, or null later, shows the rest as usual', (

@@ -1,3 +1,9 @@
+## Unreleased
+
+* A code span opened with two or more backticks and cut mid-stream
+  (``` ``co` ```) is closed with the same number of backticks, so the raw
+  backticks no longer show.
+
 ## 0.2.0
 
 * More HTML tags around plain text: `<b> <strong> <i> <em> <s> <del>

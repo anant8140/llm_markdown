@@ -7,6 +7,8 @@
   limit, lowering it hides text again, and a tap or `skipAnimation()` shows
   everything when the limit hides text; when the voice has caught up, a
   skip only ends the reveal and later text still waits for the voice.
+  With word-by-word smoothing, a limit inside a word shows none of that
+  word.
 
 ## 0.7.0
 

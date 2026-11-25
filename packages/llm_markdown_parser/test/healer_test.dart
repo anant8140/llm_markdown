@@ -25,6 +25,11 @@ void main() {
     'use `': 'use ',
     '`a` and **b': '`a` and **b**',
     '`**not bold': '`**not bold`',
+    'a ``co': 'a ``co``',
+    // a closer that has only partly arrived is dropped, not added to
+    'a ``co`': 'a ``co``',
+    'a ``x`y`': 'a ``x`y``',
+    'a ``co```': 'a ``co``',
     r'\*not emphasis': r'\*not emphasis',
     // Links and images.
     '[docs](https://exa': 'docs',
