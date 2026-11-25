@@ -155,6 +155,7 @@ selectable. With `ListView(reverse: true)` you don't need
 | Option | Default | |
 | --- | --- | --- |
 | `smoothing` | `Smoothing.adaptive()` | also `.none()`, `.gentle()`, `.fast()`, `.typewriter()`, `.wordByWord()`; `fadeLength: 0` turns the fade off |
+| `revealLimit` | – | show text only up to this position, for replies read aloud; see [Reading replies aloud](#reading-replies-aloud) |
 | `style` | from context | see [Styling](#styling) |
 | `onLinkTap` | – | called with the link URL |
 | `allowedLinkSchemes` / `allowedImageSchemes` | http, https, mailto, tel / http, https | other links show as text |
@@ -343,6 +344,31 @@ JumpToLatest(
 Headings get GitHub's ids, so `[Setup](#setup)` links scroll too. For a
 reply with thousands of lines, `sliver: true` puts the blocks straight into a
 `CustomScrollView` and builds only those on screen.
+
+### Reading replies aloud
+
+When a reply is also spoken, `revealLimit` keeps the screen behind the
+voice: the whole reply streams in and is parsed as usual, but text shows
+only up to the position you give.
+
+```dart
+final spoken = ValueNotifier(0);
+
+StreamingMarkdown(
+  controller: controller,
+  revealLimit: voiceOn ? spoken : null, // null: shown as usual
+);
+
+// from your text-to-speech progress, a position in controller.text
+spoken.value = endOfSentenceBeingSpoken;
+```
+
+The position counts in `controller.text`, the Markdown, so if you speak
+the reply sentence by sentence, give the end of the sentence being spoken.
+Smoothing still applies up to the limit, lowering it hides text again, and
+a tap or `skipAnimation()` shows everything. Turning the voice off in the
+middle (`null`) reveals the rest as usual. `controller.reset()` clears the
+reply, cached blocks included, if it is pulled while being spoken.
 
 ### Your own syntax
 

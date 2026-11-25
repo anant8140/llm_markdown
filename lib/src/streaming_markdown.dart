@@ -49,6 +49,7 @@ class StreamingMarkdown extends StatefulWidget {
     super.key,
     required StreamingMarkdownController this.controller,
     this.smoothing = const Smoothing.adaptive(),
+    this.revealLimit,
     this.style,
     this.onLinkTap,
     this.imageBuilder,
@@ -110,6 +111,7 @@ class StreamingMarkdown extends StatefulWidget {
     Stream<String> this.stream, {
     super.key,
     this.smoothing = const Smoothing.adaptive(),
+    this.revealLimit,
     this.style,
     this.onLinkTap,
     this.imageBuilder,
@@ -171,6 +173,7 @@ class StreamingMarkdown extends StatefulWidget {
     super.key,
     this.isComplete = true,
     this.smoothing = const Smoothing.adaptive(),
+    this.revealLimit,
     this.style,
     this.onLinkTap,
     this.imageBuilder,
@@ -250,6 +253,24 @@ class StreamingMarkdown extends StatefulWidget {
   /// How fast arriving text is revealed. Text that is already there when
   /// the widget first builds is shown at once.
   final Smoothing smoothing;
+
+  /// How much of the reply may be shown, as a position in the controller's
+  /// text (the Markdown, in UTF-16 code units); null shows everything.
+  ///
+  /// For replies that are also read aloud: the whole reply streams in and
+  /// is parsed as usual, but the screen shows text only up to this
+  /// position, so nothing appears before the voice reaches it. Move it
+  /// forward from the text-to-speech progress, for example to the end of
+  /// the sentence being spoken. Leave it null, or pass null later, for
+  /// users who don't use the voice; the rest is then revealed as usual.
+  ///
+  /// [smoothing] still applies up to the limit. A position inside a letter
+  /// shows the whole letter. Lowering the limit hides text again. Tapping
+  /// the reply, or [StreamingMarkdownController.skipAnimation], shows
+  /// everything and ignores the limit until the text is replaced or
+  /// replayed. [onComplete] is called once the limit reaches the end of a
+  /// complete reply.
+  final ValueListenable<int>? revealLimit;
 
   /// The look; defaults to [StreamingMarkdownStyle.of] the context, which
   /// follows the app's text style and accent color.
@@ -479,6 +500,9 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
 
   int _generation = 0;
   int _shown = 0;
+  // set when the reader skipped the reveal; ignores revealLimit until the
+  // text is replaced or replayed
+  bool _limitLifted = false;
   double _carry = 0;
   Duration _lastTick = Duration.zero;
   bool _followScheduled = false;
@@ -492,6 +516,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
   void initState() {
     super.initState();
     widget.headings?.attach(_settings.anchors);
+    widget.revealLimit?.addListener(_onLimitChanged);
     _attach();
   }
 
@@ -568,7 +593,8 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
   void _showAll() {
     _ticker.stop();
     _carry = 0;
-    _shown = _controller.text.length;
+    _limitLifted = false;
+    _shown = _target;
     _parser.reset();
     _blockWidgets.clear();
     _thinkingParser.reset();
@@ -586,13 +612,56 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       ? const Smoothing.none()
       : widget.smoothing;
 
+  /// Where the reveal is heading: the end of the text, or the
+  /// [StreamingMarkdown.revealLimit] when that is lower.
+  int get _target {
+    final text = _controller.text;
+    final limit = _limitLifted ? null : widget.revealLimit?.value;
+    if (limit == null || limit >= text.length) return text.length;
+    return graphemeBoundaryAtOrAfter(text, limit);
+  }
+
   void _skip() {
     if (_shown >= _controller.text.length) return;
     setState(() {
       _ticker.stop();
       _carry = 0;
+      _limitLifted = true;
       _shown = _controller.text.length;
     });
+  }
+
+  void _onLimitChanged() {
+    if (_moveToTarget()) setState(() {});
+  }
+
+  /// Moves [_shown] toward [_target], at once or by starting the ticker.
+  /// Returns whether to rebuild now; false when a throttled update was
+  /// scheduled instead.
+  bool _moveToTarget() {
+    final target = _target;
+    if (_shown > target) {
+      _ticker.stop();
+      _carry = 0;
+      _shown = target;
+    } else if (_controller.isPaused) {
+      _ticker.stop();
+    } else if (!_smoothing.enabled) {
+      if (widget.updateInterval > Duration.zero) {
+        // coalesce bursts of small chunks into one update per interval
+        _throttle ??= Timer(widget.updateInterval, () {
+          _throttle = null;
+          if (mounted) setState(() => _shown = math.max(_shown, _target));
+        });
+        return false;
+      }
+      _shown = target;
+    } else if (_shown < target && !_ticker.isActive) {
+      _lastTick = Duration.zero;
+      _lastUpdate = Duration.zero;
+      unawaited(_ticker.start());
+    }
+    return true;
   }
 
   void _notify(String visible, bool complete) {
@@ -622,6 +691,12 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     if (widget.headings != oldWidget.headings) {
       oldWidget.headings?.detach(_settings.anchors);
       widget.headings?.attach(_settings.anchors);
+    }
+    if (widget.revealLimit != oldWidget.revealLimit) {
+      oldWidget.revealLimit?.removeListener(_onLimitChanged);
+      widget.revealLimit?.addListener(_onLimitChanged);
+      if (widget.revealLimit != null) _limitLifted = false;
+      _moveToTarget();
     }
     if (widget.syntax != oldWidget.syntax) {
       _parser = IncrementalMarkdownParser(syntax: widget.syntax);
@@ -693,6 +768,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
       _seenReplays = _controller.replayCount;
       _ticker.stop();
       _carry = 0;
+      _limitLifted = false;
       _shown = 0;
       _parser.reset();
       _blockWidgets.clear();
@@ -702,32 +778,18 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     if (_controller.skipCount != _seenSkips) {
       _seenSkips = _controller.skipCount;
       _ticker.stop();
+      _limitLifted = true;
       _shown = text.length;
-    } else if (_controller.isPaused) {
-      _ticker.stop();
-    } else if (!_smoothing.enabled) {
-      if (widget.updateInterval > Duration.zero) {
-        // coalesce bursts of small chunks into one update per interval
-        _throttle ??= Timer(widget.updateInterval, () {
-          _throttle = null;
-          if (mounted) setState(() => _shown = _controller.text.length);
-        });
-        return;
-      }
-      _shown = text.length;
-    } else if (_shown > text.length) {
-      _shown = text.length;
-    } else if (_shown < text.length && !_ticker.isActive) {
-      _lastTick = Duration.zero;
-      _lastUpdate = Duration.zero;
-      unawaited(_ticker.start());
+    } else if (!_moveToTarget()) {
+      return;
     }
     setState(() {});
   }
 
   void _onTick(Duration elapsed) {
     final text = _controller.text;
-    final waiting = text.length - _shown;
+    final target = _target;
+    final waiting = target - _shown;
     if (waiting <= 0) {
       _ticker.stop();
       return;
@@ -741,16 +803,16 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     final step = _carry.isFinite ? _carry.floor() : waiting;
     if (step <= 0) return;
     _carry = _carry.isFinite ? _carry - step : 0;
-    var next = graphemeBoundaryAtOrAfter(
-      text,
-      math.min(text.length, _shown + step),
-    );
+    var next = graphemeBoundaryAtOrAfter(text, math.min(target, _shown + step));
     if (_smoothing.unit == RevealUnit.word) {
-      next = wordBoundaryAtOrAfter(text, next, _shown, _controller.isComplete);
+      next = math.min(
+        target,
+        wordBoundaryAtOrAfter(text, next, _shown, _controller.isComplete),
+      );
       if (next == _shown) return;
     }
     setState(() => _shown = next);
-    if (_shown >= text.length) {
+    if (_shown >= target) {
       _ticker.stop();
       _carry = 0;
     }
@@ -761,6 +823,7 @@ class _StreamingMarkdownState extends State<StreamingMarkdown>
     _throttle?.cancel();
     _idleTimer?.cancel();
     _ticker.dispose();
+    widget.revealLimit?.removeListener(_onLimitChanged);
     _detach();
     widget.headings?.detach(_settings.anchors);
     super.dispose();

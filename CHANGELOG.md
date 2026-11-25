@@ -1,3 +1,12 @@
+## Unreleased
+
+* `StreamingMarkdown.revealLimit`: for replies that are also read aloud,
+  the screen shows text only up to a position you move forward from the
+  text-to-speech progress, so nothing appears before the voice reaches it.
+  Null (the default) changes nothing; smoothing still applies up to the
+  limit, lowering it hides text again, and a tap or `skipAnimation()` shows
+  everything.
+
 ## 0.7.0
 
 * A tool call's line says what the call is about while the model writes it:
