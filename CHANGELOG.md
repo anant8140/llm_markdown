@@ -1,4 +1,4 @@
-## Unreleased
+## 0.7.1
 
 * `StreamingMarkdown.revealLimit`: for replies that are also read aloud,
   the screen shows text only up to a position you move forward from the

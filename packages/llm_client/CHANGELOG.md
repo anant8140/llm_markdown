@@ -1,4 +1,4 @@
-## Unreleased
+## 0.1.2
 
 * OpenAI-compatible servers that leave `index` out of streamed tool calls:
   parallel calls are kept apart instead of merged into one, which failed

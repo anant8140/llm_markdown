@@ -1,4 +1,4 @@
-## Unreleased
+## 0.2.1
 
 * `ChatListController.delete` after `dispose` is ignored, for a delete
   confirmed in a dialog after the screen closed; it used to throw.

@@ -1,4 +1,4 @@
-## Unreleased
+## 0.2.1
 
 * A code span opened with two or more backticks and cut mid-stream
   (``` ``co` ```) is closed with the same number of backticks, so the raw

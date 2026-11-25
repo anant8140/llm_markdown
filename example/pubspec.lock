@@ -198,14 +198,14 @@ packages:
       path: "../packages/llm_client"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.1.2"
   llm_markdown:
     dependency: "direct main"
     description:
       path: ".."
       relative: true
     source: path
-    version: "0.7.0"
+    version: "0.7.1"
   llm_markdown_client:
     dependency: "direct main"
     description:
@@ -219,7 +219,7 @@ packages:
       path: "../packages/llm_markdown_parser"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.2.1"
   markdown:
     dependency: transitive
     description:
@@ -321,7 +321,7 @@ packages:
       path: "../packages/server_sent_events"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.2.1"
   sky_engine:
     dependency: transitive
     description: flutter
